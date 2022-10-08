@@ -182,15 +182,14 @@ and API Keys.  Then set the environment variable INTERLEX_API_KEY with your key.
     #         addbidsignore(directory,os.path.basename(str(outputfile + ".png")))
 
 def addbidsignore(directory,filename_to_add):
-    logging.info("Adding file %s to %s/.bidsignore..." %(filename_to_add,directory))
+    logging.info(f"Adding file {filename_to_add} to {directory}/.bidsignore...")
     # adds filename_to_add to .bidsignore file in directory
     if not isfile(os.path.join(directory,".bidsignore")):
         with open(os.path.join(directory,".bidsignore"),"w") as text_file:
             text_file.write("%s\n" %filename_to_add)
-    else:
-        if filename_to_add not in open(os.path.join(directory,".bidsignore")).read():
-            with open(os.path.join(directory,".bidsignore"),"a") as text_file:
-                text_file.write("%s\n" %filename_to_add)
+    elif filename_to_add not in open(os.path.join(directory,".bidsignore")).read():
+        with open(os.path.join(directory,".bidsignore"),"a") as text_file:
+            text_file.write("%s\n" %filename_to_add)
 
 def addimagingsessions(bids_layout,subject_id,session,participant, directory,img_session=None):
     '''

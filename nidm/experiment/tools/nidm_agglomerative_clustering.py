@@ -40,7 +40,7 @@ def full_ac(nidm_file_list, output_file, variables):
     ac()
 
 
-def data_aggregation():  # all data from all the files is collected
+def data_aggregation():    # all data from all the files is collected
     """    This function provides query support for NIDM graphs.   """
     # query result list
     results = []
@@ -51,27 +51,20 @@ def data_aggregation():  # all data from all the files is collected
 
         print("Your command was: " + command)
         if (o is not None):
-            f = open(o, "w")
-            f.write("Your command was " + command)
-            f.close()
+            with open(o, "w") as f:
+                f.write("Your command was " + command)
         verbosity = 0
-        restParser = RestParser(verbosity_level=int(verbosity))
+        restParser = RestParser(verbosity_level=verbosity)
         restParser.setOutputFormat(RestParser.OBJECT_FORMAT)
         global df_list  # used in dataparsing()
         df_list = []
         # set up uri to do fields query for each nidm file
         global file_list
         file_list = n.split(",")
-        df_list_holder = {}
-        for i in range(len(file_list)):
-            df_list_holder[i] = []
-        df_holder = {}
-        for i in range(len(file_list)):
-            df_holder[i] = []
+        df_list_holder = {i: [] for i in range(len(file_list))}
+        df_holder = {i: [] for i in range(len(file_list))}
         global condensed_data_holder
-        condensed_data_holder = {}
-        for i in range(len(file_list)):
-            condensed_data_holder[i] = []
+        condensed_data_holder = {i: [] for i in range(len(file_list))}
         count = 0
         not_found_count = 0
         for nidm_file in file_list:
@@ -92,7 +85,7 @@ def data_aggregation():  # all data from all the files is collected
                     model_list.pop(i)
                 else:
                     vars = vars + model_list[i] + ","
-            vars = vars[0:len(vars) - 1]
+            vars = vars[:-1]
             uri = "/projects/" + project[0].toPython().split("/")[-1] + "?fields=" + vars
             # get fields output from each file and concatenate
             df_list_holder[count].append(pd.DataFrame(restParser.run([nidm_file], uri)))
@@ -104,7 +97,7 @@ def data_aggregation():  # all data from all the files is collected
             numcols = (len(data) - 1) // (len(model_list))  # Finds the number of columns in the original dataframe
             global condensed_data  # also used in linreg()
             condensed_data_holder[count] = [[0] * (len(model_list))]  # makes an array 1 row by the number of necessary columns
-            for i in range(numcols):  # makes the 2D array big enough to store all of the necessary values in the edited dataset
+            for _ in range(numcols):
                 condensed_data_holder[count].append([0] * (len(model_list)))
             for i in range(len(model_list)):  # stores the independent variable names in the first row
                 condensed_data_holder[count][0][i] = model_list[i]
@@ -163,14 +156,14 @@ def data_aggregation():  # all data from all the files is collected
                 numrows = 1  # resets to the first row for the next variable
             temp_list = condensed_data_holder[count]
             for j in range(len(temp_list[0]) - 1, 0,-1):  # if the software appends a column with 0 as the heading, it removes this null column
-                if temp_list[0][j] == "0" or temp_list[0][j] == "NaN":
+                if temp_list[0][j] in ["0", "NaN"]:
                     for row in condensed_data_holder[count]:
                         row.pop(j)
             rowsize = len(condensed_data_holder[count][0])
             count1 = 0
-            for i in range(0, rowsize):
+            for i in range(rowsize):
                 for row in condensed_data_holder[count]:
-                    if row[i] == 0 or row[i] == "NaN" or row[i] == "0":
+                    if row[i] in [0, "NaN", "0"]:
                         count1 = count1 + 1
                 if count1 > len(condensed_data_holder[count]) - 2:
                     not_found_list.append(condensed_data_holder[count][0][i])
@@ -182,7 +175,7 @@ def data_aggregation():  # all data from all the files is collected
                 if " " in vars[i]:
                     vars[i] = vars[i].replace(" ", "_")
             count = count + 1
-            if len(not_found_list) > 0:
+            if not_found_list:
                 print(
                         "***********************************************************************************************************")
                 print()
@@ -191,17 +184,15 @@ def data_aggregation():  # all data from all the files is collected
                 print(
                         "The following variables were not found in " + nidm_file + ". The model cannot run because this will skew the data. Try checking your spelling or use nidm_query.py to see other possible variables.")
                 if (o is not None):
-                    f = open(o, "a")
-                    f.write("Your variables were " + v)
-                    f.write(
-                            "The following variables were not found in " + nidm_file + ". The model cannot run because this will skew the data. Try checking your spelling or use nidm_query.py to see other possible variables.")
-                    f.close()
-                for i in range(0, len(not_found_list)):
-                    print(str(i + 1) + ". " + not_found_list[i])
+                    with open(o, "a") as f:
+                        f.write("Your variables were " + v)
+                        f.write(
+                                "The following variables were not found in " + nidm_file + ". The model cannot run because this will skew the data. Try checking your spelling or use nidm_query.py to see other possible variables.")
+                for i in range(len(not_found_list)):
+                    print(f"{str(i + 1)}. " + not_found_list[i])
                     if (o is not None):
-                        f = open(o, "a")
-                        f.write(str(i + 1) + ". " + not_found_list[i])
-                        f.close()
+                        with open(o, "a") as f:
+                            f.write(f"{str(i + 1)}. " + not_found_list[i])
                 for j in range(len(not_found_list) - 1, 0, -1):
                     not_found_list.pop(j)
                 not_found_count = not_found_count + 1
@@ -219,7 +210,7 @@ def data_aggregation():  # all data from all the files is collected
 def dataparsing(): #The data is changed to a format that is usable by the linear regression method
     global condensed_data
     condensed_data = []
-    for i in range(0, len(file_list)):
+    for i in range(len(file_list)):
         condensed_data = condensed_data + condensed_data_holder[i]
     x = pd.read_csv(opencsv(condensed_data))  # changes the dataframe to a csv to make it easier to work with
     x.head()  # prints what the csv looks like
@@ -244,26 +235,27 @@ def dataparsing(): #The data is changed to a format that is usable by the linear
                     j] not in stringvars:  # adds the variable name to the list if it isn't there already
                     stringvars.append(condensed_data[0][j])
     le = preprocessing.LabelEncoder()  # anything involving le shows the encoding of categorical variables
-    for i in range(len(stringvars)):
-        le.fit(obj_df[stringvars[i]].astype(str))
+    for stringvar in stringvars:
+        le.fit(obj_df[stringvar].astype(str))
     obj_df_trf = obj_df.astype(str).apply(le.fit_transform)  # transforms the categorical variables into numbers.
     global df_final  # also used in linreg()
-    if not obj_df_trf.empty:
-        df_final = pd.concat([df_int_float, obj_df_trf], axis=1)  # join_axes=[df_int_float.index])
-    else:
-        df_final = df_int_float
+    df_final = (
+        df_int_float
+        if obj_df_trf.empty
+        else pd.concat([df_int_float, obj_df_trf], axis=1)
+    )
+
     df_final.head()  # shows the final dataset with all the encoding
     print(df_final)  # prints the final dataset
     print()
     print("***********************************************************************************************************")
     print()
     if (o is not None):
-        f = open(o, "a")
-        f.write(df_final.to_string(header=True, index=True))
-        f.write(
-            "\n\n***********************************************************************************************************")
-        f.write("\n\nModel Results: ")
-        f.close()
+        with open(o, "a") as f:
+            f.write(df_final.to_string(header=True, index=True))
+            f.write(
+                "\n\n***********************************************************************************************************")
+            f.write("\n\nModel Results: ")
 def ac():
     index = 0
     global levels  # also used in contrasting()
@@ -298,7 +290,7 @@ def ac():
     plt.scatter(X[labels == 4, 0], X[labels == 4, 1], s=50, marker='o', color='orange')
     plt.show()
 
-    
+
     if (o is not None):
         f = open(o, "a")
         f.close()

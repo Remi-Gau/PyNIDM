@@ -11,7 +11,7 @@ def main(argv):
     kwargs={Constants.NIDM_PROJECT_NAME:"FBIRN_PhaseII",Constants.NIDM_PROJECT_IDENTIFIER:9610,Constants.NIDM_PROJECT_DESCRIPTION:"Test investigation"}
     project = Project(attributes=kwargs)
 
-    
+
     #test add string attribute with existing namespace
     #nidm_doc.addLiteralAttribute("nidm","isFun","ForMe")
     project.add_attributes({Constants.NIDM["isFun"]:"ForMe"})
@@ -20,13 +20,8 @@ def main(argv):
     project.addLiteralAttribute("fred","notFound","in namespaces","www.fred.org/")
 
     #test add float attribute
-    project.addLiteralAttribute("nidm", "float", float(2.34))
+    project.addLiteralAttribute("nidm", "float", 2.34)
 
-    #test adding attributes in bulk with mix of existing and new namespaces
-    #nidm_doc.addAttributesWithNamespaces(nidm_doc.getProject(),[{"prefix":"nidm", "uri":nidm_doc.namespaces["nidm"], "term":"score", "value":int(15)}, \
-        #                                              {"prefix":"dave", "uri":"http://www.davidkeator.com/", "term":"isAwesome", "value":"15"}, \
-        #                                              {"prefix":"nidm", "uri":nidm_doc.namespaces["nidm"], "term":"value", "value":float(2.34)}])
-    
     #nidm_doc.addAttributes(nidm_doc.getProject(),{"nidm:test":int(15), "ncit:isTerminology":"15","ncit:joker":float(1)})
 
 

@@ -71,7 +71,7 @@ def GetImageFromAWS(location, output_file,args):
     :return: None if file not downloaded else will return True
     '''
 
-    print("Trying AWS S3 for dataset: %s" % location)
+    print(f"Trying AWS S3 for dataset: {location}")
     # modify location to remove everything before the dataset name
     # problem is we don't know the dataset identifier inside the path string because
     # it doesn't have any constraints.  For openneuro datasets they start with "ds" so
@@ -181,17 +181,12 @@ def GetDataElementMetadata(nidm_graph,de_uuid):
     #current_tuple = str(DD(source="participants.tsv", variable=column))
 
     # temporary dictionary of metadata
-    temp_dict = {}
-    # add info to BIDS-formatted json sidecar file
-    for row in qres:
-        temp_dict[str(row[0])] = str(row[1])
-
+    temp_dict = {str(row[0]): str(row[1]) for row in qres}
     # set up a dictionary entry for this column
     current_tuple = str(DD(source="participants.tsv", variable=
         temp_dict['http://purl.org/nidash/nidm#sourceVariable']))
 
-    de = {}
-    de[current_tuple] = {}
+    de = {current_tuple: {}}
     # now look for label entry in temp_dict and set up a proper NIDM-style JSON data structure
     # see Utils.py function map_variables_to_terms for example (column_to_terms[current_tuple])
     for key,value in temp_dict.items():
@@ -250,15 +245,11 @@ def GetDataElementMetadata(nidm_graph,de_uuid):
         elif key =='http://purl.org/nidash/nidm#valueType':
             if 'responseOptions' not in de[current_tuple].keys():
                 de[current_tuple]['responseOptions'] = {}
-                de[current_tuple]['responseOptions']['valueType'] = value
-            else:
-                de[current_tuple]['responseOptions']['valueType'] = value
+            de[current_tuple]['responseOptions']['valueType'] = value
         elif key == 'http://purl.org/nidash/nidm#levels':
             if 'responseOptions' not in de[current_tuple].keys():
                 de[current_tuple]['responseOptions'] = {}
-                de[current_tuple]['responseOptions']['levels'] = value
-            else:
-                de[current_tuple]['responseOptions']['levels'] = value
+            de[current_tuple]['responseOptions']['levels'] = value
         elif key ==  'http://uri.interlex.org/ilx_0739289':
             de[current_tuple]['associatedWith'] = value
         elif key == Constants.NIDM['minValue']:
@@ -409,7 +400,7 @@ def NIDMProject2BIDSDatasetDescriptor(nidm_graph,output_directory):
         for key,value in BIDS_Constants.dataset_description.items():
             if BIDS_Constants.dataset_description[key]._uri == proj_key:
                 # added since BIDS validator validates values of certain keys
-                if (key == "Authors") or (key == "Funding") or (key == "ReferencesAndLinks"):
+                if key in ["Authors", "Funding", "ReferencesAndLinks"]:
                     project_metadata[key] = [project_metadata[proj_key]]
                 else:
                     project_metadata[key] = project_metadata[proj_key]

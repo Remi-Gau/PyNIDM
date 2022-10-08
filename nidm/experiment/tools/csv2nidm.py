@@ -123,23 +123,35 @@ def main(argv):
     #    column_to_terms = map_variables_to_terms(df=df, apikey=args.key, directory=dirname(args.output_file), output_file=args.output_file, json_file=args.json_map, owl_file=args.owl)
     #else:
     # if user did not specify -no_concepts then associate concepts interactively with user
-    if not args.no_concepts:
-        column_to_terms, cde = map_variables_to_terms(df=df,  assessment_name=basename(args.csv_file),
-                                                    directory=dirname(args.output_file), output_file=args.output_file,
-                                                      json_source=json_map,dataset_identifier=args.dataset_identifier)
-    # run without concept mappings
-    else:
-        column_to_terms, cde = map_variables_to_terms(df=df, assessment_name=basename(args.csv_file),
-                                                      directory=dirname(args.output_file), output_file=args.output_file,
-                                                      json_source=json_map, associate_concepts=False,
-                                                      dataset_identifier=args.dataset_identifier)
+    column_to_terms, cde = (
+        map_variables_to_terms(
+            df=df,
+            assessment_name=basename(args.csv_file),
+            directory=dirname(args.output_file),
+            output_file=args.output_file,
+            json_source=json_map,
+            associate_concepts=False,
+            dataset_identifier=args.dataset_identifier,
+        )
+        if args.no_concepts
+        else map_variables_to_terms(
+            df=df,
+            assessment_name=basename(args.csv_file),
+            directory=dirname(args.output_file),
+            output_file=args.output_file,
+            json_source=json_map,
+            dataset_identifier=args.dataset_identifier,
+        )
+    )
 
     if args.logfile is not None:
         logging.basicConfig(filename=join(args.logfile,'csv2nidm_' + os.path.splitext(os.path.basename(args.csv_file))[0] + '.log'), level=logging.DEBUG)
         # add some logging info
-        logging.info("csv2nidm %s" %args)
+        logging.info(f"csv2nidm {args}")
 
 
+    #look at column_to_terms dictionary for NIDM URL for subject id  (Constants.NIDM_SUBJECTID)
+    id_field=None
     #If user has added an existing NIDM file as a command line parameter then add to existing file for subjects who exist in the NIDM file
     if args.nidm_file:
         print("Adding to NIDM file...")
@@ -155,20 +167,19 @@ def main(argv):
         #get list of session objects
         session_objs=project.get_sessions()
 
-        #look at column_to_terms dictionary for NIDM URL for subject id  (Constants.NIDM_SUBJECTID)
-        id_field=None
         for key, value in column_to_terms.items():
             if 'isAbout' in column_to_terms[key]:
-                for isabout_key,isabout_value in  column_to_terms[key]['isAbout'].items():
-                    if (isabout_key == 'url') or (isabout_key == '@id'):
-                        if (isabout_value == Constants.NIDM_SUBJECTID._uri):
-                            key_tuple = eval(key)
-                            #id_field=key
-                            id_field = key_tuple.variable
-                            #make sure id_field is a string for zero-padded subject ids
-                            #re-read data file with constraint that key field is read as string
-                            df = pd.read_csv(args.csv_file,dtype={id_field : str})
-                            break
+                for isabout_key,isabout_value in column_to_terms[key]['isAbout'].items():
+                    if isabout_key in ['url', '@id'] and (
+                        isabout_value == Constants.NIDM_SUBJECTID._uri
+                    ):
+                        key_tuple = eval(key)
+                        #id_field=key
+                        id_field = key_tuple.variable
+                        #make sure id_field is a string for zero-padded subject ids
+                        #re-read data file with constraint that key field is read as string
+                        df = pd.read_csv(args.csv_file,dtype={id_field : str})
+                        break
 
         #if we couldn't find a subject ID field in column_to_terms, ask user
         if id_field is None:
@@ -224,7 +235,7 @@ def main(argv):
 
             #if there was data about this subject in the NIDM file already (i.e. an agent already exists with this subject id)
             #then add this CSV assessment data to NIDM file, else skip it....
-            if (not (len(csv_row.index)==0)):
+            if len(csv_row.index) != 0:
 
                 logging.info("found participant in CSV file" )
 
@@ -261,15 +272,13 @@ def main(argv):
 
                 #store other data from row with columns_to_term mappings
                 for row_variable in csv_row:
-                    #check if row_variable is subject id, if so skip it
                     if row_variable==id_field:
                         continue
-                    else:
-                        if not csv_row[row_variable].values[0]:
-                            continue
+                    if not csv_row[row_variable].values[0]:
+                        continue
 
 
-                        add_attributes_with_cde(acq_entity, cde, row_variable, csv_row[row_variable].values[0])
+                    add_attributes_with_cde(acq_entity, cde, row_variable, csv_row[row_variable].values[0])
 
 
 
@@ -296,8 +305,6 @@ def main(argv):
         project.add_attributes({Constants.NIDM_FILENAME:args.csv_file})
 
 
-        #look at column_to_terms dictionary for NIDM URL for subject id  (Constants.NIDM_SUBJECTID)
-        id_field=None
         for key, value in column_to_terms.items():
             # using isAbout concept association to associate subject identifier variable from csv with a known term
             # for subject IDs

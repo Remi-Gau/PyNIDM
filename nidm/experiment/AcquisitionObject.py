@@ -29,14 +29,9 @@ class AcquisitionObject(pm.ProvEntity,Core):
 
         """
 
-        if uuid is None:
-            self._uuid = getUUID()
-            #execute default parent class constructor
-            super(AcquisitionObject,self).__init__(acquisition.graph, pm.QualifiedName(pm.Namespace("niiri",Constants.NIIRI),self.get_uuid()),attributes)
-        else:
-            self._uuid = uuid
-            super(AcquisitionObject,self).__init__(acquisition.graph, pm.QualifiedName(pm.Namespace("niiri",Constants.NIIRI),self.get_uuid()),attributes)
-
+        self._uuid = getUUID() if uuid is None else uuid
+        #execute default parent class constructor
+        super(AcquisitionObject,self).__init__(acquisition.graph, pm.QualifiedName(pm.Namespace("niiri",Constants.NIIRI),self.get_uuid()),attributes)
         acquisition.graph._add_record(self)
 
         #carry graph object around

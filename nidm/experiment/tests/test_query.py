@@ -94,7 +94,7 @@ def test_GetProjects():
     project_list = Query.GetProjectsUUID(["test_gp.ttl"])
 
     remove("test_gp.ttl")
-    assert Constants.NIIRI + "_123456" in [ str(x) for x in project_list]
+    assert f"{Constants.NIIRI}_123456" in [ str(x) for x in project_list]
 
 def test_GetParticipantIDs():
 
@@ -145,8 +145,13 @@ def test_GetProjectInstruments():
 
     remove("test_gpi.ttl")
 
-    assert Constants.NIDM + "NorthAmericanAdultReadingTest" in [str(x) for x in assessment_list['assessment_type'].to_list()]
-    assert Constants.NIDM + "PositiveAndNegativeSyndromeScale" in [str(x) for x in assessment_list['assessment_type'].to_list()]
+    assert f"{Constants.NIDM}NorthAmericanAdultReadingTest" in [
+        str(x) for x in assessment_list['assessment_type'].to_list()
+    ]
+
+    assert f"{Constants.NIDM}PositiveAndNegativeSyndromeScale" in [
+        str(x) for x in assessment_list['assessment_type'].to_list()
+    ]
 
 
 '''
@@ -176,7 +181,7 @@ Returns the
   
 '''
 def saveTestFile(file_name, data):
-    project = Project(uuid="_123_" + file_name, attributes=data)
+    project = Project(uuid=f"_123_{file_name}", attributes=data)
 
     return saveProject(file_name, project)
 
@@ -184,7 +189,7 @@ def saveProject(file_name, project):
     # save a turtle file
     with open(file_name, 'w') as f:
         f.write(project.serializeTurtle())
-    return "nidm:_123_{}".format(file_name)
+    return f"nidm:_123_{file_name}"
 
 
 def makeProjectTestFile(filename):
@@ -235,12 +240,10 @@ def makeProjectTestFile2(filename):
               Constants.NIDM_SOLUTION_FLOW_SPEED: "2.8",
               Constants.NIDM_RECORDING_LOCATION: "lab"
               }
-    project = Project(uuid="_123_" + filename, attributes=kwargs)
+    project = Project(uuid=f"_123_{filename}", attributes=kwargs)
     s1 = Session(project)
 
     a1 = AssessmentAcquisition(session=s1)
-      # = s1.add_acquisition("a1", attributes={"http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#Age" : 22})
-
     p1 = a1.add_person("p1", attributes={Constants.NIDM_GIVEN_NAME:"George", Constants.NIDM_AGE: 22})
     a1.add_qualified_association(person=p1, role=Constants.NIDM_PARTICIPANT)
 
@@ -271,13 +274,19 @@ def test_GetProjectsMetadata():
     # assert parsed['projects'][p1].get (Query.matchPrefix(str(Constants.NIDM_NUMBER_OF_SUBJECTS)), -1) == -1
 
     if USE_GITHUB_DATA:
-        # find the project ID from the CMU file
-        p3 = None
-        for project_id in parsed['projects']:
-            if project_id != p1 and project_id != p2:
-                if parsed['projects'][project_id][str(Constants.NIDM_PROJECT_NAME)] == "ABIDE - CMU_a":
-                    p3 = project_id
-                    break
+        p3 = next(
+            (
+                project_id
+                for project_id in parsed['projects']
+                if project_id not in [p1, p2]
+                and parsed['projects'][project_id][
+                    str(Constants.NIDM_PROJECT_NAME)
+                ]
+                == "ABIDE - CMU_a"
+            ),
+            None,
+        )
+
         assert p3 != None
 
 
@@ -362,7 +371,7 @@ def test_download_cde_files():
     fcount = 0
     for url in Constants.CDE_FILE_LOCATIONS:
         fname = url.split('/')[-1]
-        assert path.isfile("{}/{}".format(cde_dir, fname) )
+        assert path.isfile(f"{cde_dir}/{fname}")
         fcount += 1
     assert fcount > 0
 

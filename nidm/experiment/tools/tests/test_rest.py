@@ -52,11 +52,14 @@ def setup():
     restParser = RestParser(output_format=RestParser.OBJECT_FORMAT)
     projects = restParser.run(BRAIN_VOL_FILES, '/projects')
     for p in projects:
-        proj_info = restParser.run(BRAIN_VOL_FILES, '/projects/{}'.format(p))
+        proj_info = restParser.run(BRAIN_VOL_FILES, f'/projects/{p}')
         if 'dctypes:title' in proj_info.keys() and proj_info['dctypes:title'] == 'ABIDE - CMU_a':
             cmu_test_project_uuid = p
             break
-    subjects = restParser.run(BRAIN_VOL_FILES, '/projects/{}/subjects'.format(cmu_test_project_uuid))
+    subjects = restParser.run(
+        BRAIN_VOL_FILES, f'/projects/{cmu_test_project_uuid}/subjects'
+    )
+
     cmu_test_subject_uuid = subjects['uuid'][0]
 
 
@@ -68,10 +71,13 @@ def setup():
 
     projects2 = restParser.run(OPENNEURO_FILES, '/projects')
     for p in projects2:
-        proj_info = restParser.run(OPENNEURO_FILES, '/projects/{}'.format(p))
+        proj_info = restParser.run(OPENNEURO_FILES, f'/projects/{p}')
         if 'dctypes:title' in proj_info.keys() and proj_info['dctypes:title'] == 'Developmental changes in brain function underlying the influence of reward processing on inhibitory control (Slot Reward)':
             OPENNEURO_PROJECT_URI = p
-    subjects = restParser.run(OPENNEURO_FILES, '/projects/{}/subjects'.format(OPENNEURO_PROJECT_URI))
+    subjects = restParser.run(
+        OPENNEURO_FILES, f'/projects/{OPENNEURO_PROJECT_URI}/subjects'
+    )
+
     OPENNEURO_SUB_URI = subjects['uuid'][0]
 
 
@@ -205,10 +211,7 @@ def test_uri_project_list():
     result = restParser.run(['uritest.ttl', 'uritest2.ttl'], '/projects')
 
 
-    project_uuids = []
-
-    for uuid in result:
-        project_uuids.append(uuid)
+    project_uuids = list(result)
 
     assert type(result) == list
     assert len(project_uuids) >= 2
@@ -225,7 +228,7 @@ def test_uri_project_id():
     restParser = RestParser()
     # result = restParser.run(OPENNEURO_FILES, '/projects')
     project = OPENNEURO_PROJECT_URI
-    result = restParser.run(OPENNEURO_FILES, '/projects/{}'.format(project))
+    result = restParser.run(OPENNEURO_FILES, f'/projects/{project}')
 
 
     assert 'dctypes:title' in result
@@ -242,7 +245,7 @@ def test_uri_projects_subjects_1():
 
     proj_uuid = 'p2'
     restParser = RestParser()
-    result = restParser.run([REST_TEST_FILE], '/projects/{}/subjects'.format(proj_uuid))
+    result = restParser.run([REST_TEST_FILE], f'/projects/{proj_uuid}/subjects')
 
     assert type(result) == dict
     assert len(result['uuid']) == 2
@@ -255,7 +258,7 @@ def test_uri_subjects():
 
     restParser = RestParser()
     restParser.setOutputFormat(RestParser.OBJECT_FORMAT)
-    result = restParser.run(BRAIN_VOL_FILES, '/subjects/{}'.format(cmu_test_subject_uuid))
+    result = restParser.run(BRAIN_VOL_FILES, f'/subjects/{cmu_test_subject_uuid}')
 
     assert type(result) == dict
     assert 'uuid' in result
@@ -271,10 +274,10 @@ def test_uri_projects_subjects_id():
     restParser = RestParser()
     # result = restParser.run(OPENNEURO_FILES, '/projects')
     project = OPENNEURO_PROJECT_URI
-    result = restParser.run(OPENNEURO_FILES, '/projects/{}/subjects'.format(project))
+    result = restParser.run(OPENNEURO_FILES, f'/projects/{project}/subjects')
     subject = result['uuid'][0]
 
-    uri = '/projects/{}/subjects/{}'.format(project,subject)
+    uri = f'/projects/{project}/subjects/{subject}'
     result = restParser.run(OPENNEURO_FILES, uri)
 
     assert type(result) == dict
@@ -314,11 +317,12 @@ def test_get_software_agents():
 
 def test_brain_vols():
     restParser = RestParser()
-    if cmu_test_project_uuid:
-        project = cmu_test_project_uuid
-    else:
-        project  = (restParser.run(BRAIN_VOL_FILES, '/projects'))[0]
-    subjects = restParser.run(BRAIN_VOL_FILES, '/projects/{}/subjects'.format(project))
+    project = (
+        cmu_test_project_uuid
+        or (restParser.run(BRAIN_VOL_FILES, '/projects'))[0]
+    )
+
+    subjects = restParser.run(BRAIN_VOL_FILES, f'/projects/{project}/subjects')
     subject = subjects['uuid'][0]
 
     data = Query.GetDerivativesDataForSubject(BRAIN_VOL_FILES, None, subject)
@@ -344,7 +348,7 @@ def test_GetParticipantDetails():
         project = projects[0]
     import time
     start = time.time()
-    subjects = restParser.run(BRAIN_VOL_FILES, '/projects/{}/subjects'.format(project))
+    subjects = restParser.run(BRAIN_VOL_FILES, f'/projects/{project}/subjects')
     subject = subjects['uuid'][0]
 
 
@@ -371,7 +375,7 @@ def test_CheckSubjectMatchesFilter():
     else:
         projects  = restParser.run(BRAIN_VOL_FILES, '/projects')
         project = projects[0]
-    subjects = restParser.run(BRAIN_VOL_FILES, '/projects/{}/subjects'.format(project))
+    subjects = restParser.run(BRAIN_VOL_FILES, f'/projects/{project}/subjects')
     subject = subjects['uuid'][0]
 
     derivatives = Query.GetDerivativesDataForSubject(BRAIN_VOL_FILES, project, subject)
@@ -384,7 +388,7 @@ def test_CheckSubjectMatchesFilter():
                 break
 
     # find an actual stat and build a matching filter to make sure our matcher passes it
-    filter = "derivatives.{} eq {}".format(dt,val)
+    filter = f"derivatives.{dt} eq {val}"
     assert Query.CheckSubjectMatchesFilter( BRAIN_VOL_FILES, project, subject, filter)
 
 
@@ -396,24 +400,57 @@ def test_CheckSubjectMatchesFilter():
             older = str(float(age) + 1)
             younger = str(float(age) - 1)
 
-            assert Query.CheckSubjectMatchesFilter(BRAIN_VOL_FILES, project, subject,
-                                                   "instruments.AGE_AT_SCAN eq {}".format(str(age)))
-            assert (Query.CheckSubjectMatchesFilter(BRAIN_VOL_FILES, project, subject,
-                                                    "instruments.AGE_AT_SCAN lt {}".format(younger)) == False)
-            assert (Query.CheckSubjectMatchesFilter(BRAIN_VOL_FILES, project, subject,
-                                                    "instruments.AGE_AT_SCAN gt {}".format(younger)) == True)
-            assert Query.CheckSubjectMatchesFilter(BRAIN_VOL_FILES, project, subject,
-                                                   "instruments.AGE_AT_SCAN lt {}".format(older))
-            assert (Query.CheckSubjectMatchesFilter(BRAIN_VOL_FILES, project, subject,
-                                                    "instruments.AGE_AT_SCAN gt {}".format(older)) == False)
-        # TODO deal with spaces in identifiers and CheckSubjectMatchesFilter
+            assert Query.CheckSubjectMatchesFilter(
+                BRAIN_VOL_FILES,
+                project,
+                subject,
+                f"instruments.AGE_AT_SCAN eq {str(age)}",
+            )
+
+            assert (
+                Query.CheckSubjectMatchesFilter(
+                    BRAIN_VOL_FILES,
+                    project,
+                    subject,
+                    f"instruments.AGE_AT_SCAN lt {younger}",
+                )
+                == False
+            )
+
+            assert (
+                Query.CheckSubjectMatchesFilter(
+                    BRAIN_VOL_FILES,
+                    project,
+                    subject,
+                    f"instruments.AGE_AT_SCAN gt {younger}",
+                )
+                == True
+            )
+
+            assert Query.CheckSubjectMatchesFilter(
+                BRAIN_VOL_FILES,
+                project,
+                subject,
+                f"instruments.AGE_AT_SCAN lt {older}",
+            )
+
+            assert (
+                Query.CheckSubjectMatchesFilter(
+                    BRAIN_VOL_FILES,
+                    project,
+                    subject,
+                    f"instruments.AGE_AT_SCAN gt {older}",
+                )
+                == False
+            )
+
         elif 'age at scan' in inst:
             age = inst['age at scan']
 
             older = str(float(age) + 1)
             younger = str(float(age) - 1)
 
-            assert inst['age at scan'] != None
+            assert age != None
 
             #assert Query.CheckSubjectMatchesFilter( BRAIN_VOL_FILES, project, subject, "instruments.age at scan eq {}".format( str(age) ) )
             #assert (Query.CheckSubjectMatchesFilter( BRAIN_VOL_FILES, project, subject, "instruments.age at scan lt {}".format( younger ) ) == False)
@@ -430,11 +467,18 @@ def test_ExtremeFilters():
         projects  = restParser.run(BRAIN_VOL_FILES, '/projects')
         project = projects[0]
 
-    details = restParser.run(BRAIN_VOL_FILES, '/projects/{}?filter=AGE_AT_SCAN gt 200'.format(project))
+    details = restParser.run(
+        BRAIN_VOL_FILES, f'/projects/{project}?filter=AGE_AT_SCAN gt 200'
+    )
+
     assert len(details['subjects']['uuid']) == 0
     assert len(details['data_elements']['uuid']) > 0
 
-    details = restParser.run(BRAIN_VOL_FILES, '/projects/{}?filter=instruments.AGE_AT_SCAN gt 0'.format(project))
+    details = restParser.run(
+        BRAIN_VOL_FILES,
+        f'/projects/{project}?filter=instruments.AGE_AT_SCAN gt 0',
+    )
+
     assert len(details['subjects']['uuid']) > 0
     assert len(details['data_elements']['uuid']) > 0
 
@@ -454,7 +498,11 @@ def test_Filter_Flexibility():
     for syn in real_synonyms:
         if ' ' in syn:
             continue
-        details = restParser.run(BRAIN_VOL_FILES, '/projects/{}?filter=instruments.{} gt 2'.format(project, syn))
+        details = restParser.run(
+            BRAIN_VOL_FILES,
+            f'/projects/{project}?filter=instruments.{syn} gt 2',
+        )
+
         assert len(details['subjects']['uuid']) > 0
         assert len(details['data_elements']['uuid']) > 0
 
@@ -510,7 +558,6 @@ def assess_one_col_output(txt_output):
     ###added by DBK to deal with varying line numbers for uuids depending on the rest query type
     for line in lines:
         if is_uuid(line.strip('\"')):
-            assert True
             return line.strip('\"')
     # if we didn't find a line with a uuid then we simply flag a false assertion and return the first line of output
     # cause it doesn't really matter at this point the assertion already failed
@@ -536,7 +583,10 @@ def test_cli_rest_routes():
     # /statistics/projects/{}
     #
 
-    txt_out = rest_parser.run(BRAIN_VOL_FILES, "/statistics/projects/{}".format(project_uuid))
+    txt_out = rest_parser.run(
+        BRAIN_VOL_FILES, f"/statistics/projects/{project_uuid}"
+    )
+
     lines = txt_out.strip().splitlines()
     assert re.search('^-+ +-+$', lines[0])
     lines = lines[1:] # done testing line one, slice it off
@@ -559,7 +609,10 @@ def test_cli_rest_routes():
     # /projects/{}/subjects
     #
 
-    sub_text = rest_parser.run(BRAIN_VOL_FILES, '/projects/{}/subjects'.format(project_uuid))
+    sub_text = rest_parser.run(
+        BRAIN_VOL_FILES, f'/projects/{project_uuid}/subjects'
+    )
+
     subject_uuid = assess_one_col_output( sub_text  )
 
     #
@@ -568,14 +621,15 @@ def test_cli_rest_routes():
     # result should be in 3 sections: summary , derivatives, instruments
 
 
-    inst_text = rest_parser.run(BRAIN_VOL_FILES, '/projects/{}/subjects/{}/'.format(project_uuid, subject_uuid))
+    inst_text = rest_parser.run(
+        BRAIN_VOL_FILES, f'/projects/{project_uuid}/subjects/{subject_uuid}/'
+    )
+
     sections = inst_text.split("\n\n")
 
     # summary tests
     summary_lines = sections[0].strip().splitlines()[1:-1] # first and last lines should be -----
-    summary = dict()
-    for l in summary_lines:
-        summary[l.split()[0]] = l.split()[1]
+    summary = {l.split()[0]: l.split()[1] for l in summary_lines}
     inst_uuid = summary['instruments'].split(',')[0]
     deriv_uuid = summary['derivatives'].split(',')[0]
     assert is_uuid(inst_uuid)
@@ -607,7 +661,7 @@ def test_multiple_project_fields():
     rest_parser.setOutputFormat(RestParser.OBJECT_FORMAT)
 
     field = 'fs_000003,ilx_0100400'  # ilx0100400 is 'isAbout' age
-    fields = rest_parser.run( BRAIN_VOL_FILES, "/projects?fields={}".format(field) )
+    fields = rest_parser.run(BRAIN_VOL_FILES, f"/projects?fields={field}")
 
     # edited by DBK to account for only field values being returned
     #assert( 'field_values' in project )
@@ -616,7 +670,7 @@ def test_multiple_project_fields():
     print (fields)
     fv = fields
     assert( type( fv ) == list )
-    fields_used = set( [ i.label for i in fv ]  )
+    fields_used = {i.label for i in fv}
     assert ('brain' in fields_used) or ('Brain Segmentation Volume (mm^3)' in fields_used)
     assert 'age at scan' in fields_used
 
@@ -626,7 +680,7 @@ def test_odd_isabout_uris():
     rest_parser.setOutputFormat(RestParser.OBJECT_FORMAT)
 
     field = 'http://www.cognitiveatlas.org/ontology/cogat.owl#CAO_00962'
-    fields = rest_parser.run( BRAIN_VOL_FILES, "/projects?fields={}".format(field) )
+    fields = rest_parser.run(BRAIN_VOL_FILES, f"/projects?fields={field}")
 
     # edited by DBK to account for only field values being returned
     #assert( 'field_values' in project )
@@ -635,7 +689,7 @@ def test_odd_isabout_uris():
     print (fields)
     fv = fields
     assert( type( fv ) == list )
-    fields_used = set( [ i.label for i in fv ]  )
+    fields_used = {i.label for i in fv}
     assert 'ADOS_TOTAL' in fields_used
 
 
@@ -644,7 +698,10 @@ def test_project_fields_deriv():
     rest_parser.setOutputFormat(RestParser.OBJECT_FORMAT)
 
     field = 'fs_000003'
-    project = rest_parser.run( BRAIN_VOL_FILES, "/projects/{}?fields={}".format(cmu_test_project_uuid, field) )
+    project = rest_parser.run(
+        BRAIN_VOL_FILES, f"/projects/{cmu_test_project_uuid}?fields={field}"
+    )
+
 
     # edited by DBK to account for only field values being returned
     #assert( 'field_values' in project )
@@ -652,7 +709,7 @@ def test_project_fields_deriv():
     #fv = project['field_values']
     fv = project
     assert( type( fv ) == list )
-    fields_used = set( [ i.label for i in fv ]  )
+    fields_used = {i.label for i in fv}
     assert ('brain' in fields_used) or ('Brain Segmentation Volume (mm^3)' in fields_used)
 
 
@@ -667,7 +724,7 @@ def test_project_fields_instruments():
 
 
     field = 'age at scan'
-    uri = "/projects/{}?fields={}".format(proj_uuid,field)
+    uri = f"/projects/{proj_uuid}?fields={field}"
     project = rest_parser.run( BRAIN_VOL_FILES, uri)
 
     # edited by DBK to account for only field values being returned
@@ -676,7 +733,7 @@ def test_project_fields_instruments():
     #fv = project['field_values']
     fv = project
     assert( type( fv ) == list )
-    fields_used = set( [ i.label for i in fv ]  )
+    fields_used = {i.label for i in fv}
     assert field in fields_used
 
 
@@ -686,11 +743,14 @@ def test_project_fields_not_found():
     rest_parser.setOutputFormat(RestParser.OBJECT_FORMAT)
 
     field = 'not_real_field'
-    project = rest_parser.run( BRAIN_VOL_FILES, "/projects/{}?fields={}".format(cmu_test_project_uuid, field) )
+    project = rest_parser.run(
+        BRAIN_VOL_FILES, f"/projects/{cmu_test_project_uuid}?fields={field}"
+    )
+
 
 
     print (project)
-    keys = set( [ i for i in project ]  )
+    keys = set(list(project))
 
     assert "error" in keys
 
@@ -713,5 +773,5 @@ def test_GetProjectsComputedMetadata():
     assert parsed['projects'][p3][Query.matchPrefix(str(Constants.NIDM_NUMBER_OF_SUBJECTS))] == 14
     #assert parsed['projects'][p3]["age_min"] == 21.0
     #assert parsed['projects'][p3]["age_max"] == 33.0
-    assert set(parsed['projects'][p3][str(Constants.NIDM_GENDER)]) == set(['1', '2'])
+    assert set(parsed['projects'][p3][str(Constants.NIDM_GENDER)]) == {'1', '2'}
 

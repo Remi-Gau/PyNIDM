@@ -80,16 +80,21 @@ def sparql_query_nidm(nidm_file_list,query, output_file=None, return_graph=False
             logging.debug("Sending sparql to blazegraph: %s", query )
             r2 = requests.post(url=environ['BLAZEGRAPH_URL'], params={'query': query}, headers={'Accept': 'application/sparql-results+json'})
             content = json.loads( r2.content )
-            columns = {}
-            for key in content["head"]['vars']:
-                columns[key] = [x[key]['value'] for x in content['results']['bindings']]
+            columns = {
+                key: [x[key]['value'] for x in content['results']['bindings']]
+                for key in content["head"]['vars']
+            }
+
             df = pd.DataFrame(data=columns)
             if (output_file is not None):
                 df.to_csv(output_file)
             return df
 
         except Exception as e:
-            print("Exception while communicating with blazegraph at {}: {}".format(environ['BLAZEGRAPH_URL'],e))
+            print(
+                f"Exception while communicating with blazegraph at {environ['BLAZEGRAPH_URL']}: {e}"
+            )
+
 
 
     #query result list
@@ -122,8 +127,7 @@ def sparql_query_nidm(nidm_file_list,query, output_file=None, return_graph=False
                 #    break
 
             #append result as row to result list
-            for row in qres:
-                results.append(list(row))
+            results.extend(list(row) for row in qres)
         else:
             #execute query
             qres = rdf_graph_parse.query(query)
@@ -139,16 +143,15 @@ def sparql_query_nidm(nidm_file_list,query, output_file=None, return_graph=False
 
 
 
-    if not return_graph:
-        #convert results list to Pandas DataFrame and return
-        df = pd.DataFrame(results,columns=columns)
-
-        #if output file parameter specified
-        if (output_file is not None):
-            df.to_csv(output_file)
-        return df
-    else:
+    if return_graph:
         return qres_graph
+    #convert results list to Pandas DataFrame and return
+    df = pd.DataFrame(results,columns=columns)
+
+    #if output file parameter specified
+    if (output_file is not None):
+        df.to_csv(output_file)
+    return df
 
 
 def GetProjectsUUID(nidm_file_list,output_file=None):
@@ -285,8 +288,7 @@ def GetDataElementProperties(nidm_file_list):
 
             }'''
 
-    df = sparql_query_nidm(nidm_file_list.split(','), query, output_file=None)
-    return df
+    return sparql_query_nidm(nidm_file_list.split(','), query, output_file=None)
 
 def GetProjectInstruments(nidm_file_list, project_id):
     """
@@ -388,9 +390,7 @@ def GetParticipantIDs(nidm_file_list,output_file=None):
         }
     ''' %(Constants.NIDM_PARTICIPANT,Constants.NIDM_SUBJECTID)
 
-    df = sparql_query_nidm(nidm_file_list,query, output_file=output_file)
-
-    return df
+    return sparql_query_nidm(nidm_file_list,query, output_file=output_file)
 
 def GetParticipantIDFromAcquisition(nidm_file_list,acquisition, output_file=None):
     '''
@@ -425,9 +425,7 @@ def GetParticipantIDFromAcquisition(nidm_file_list,acquisition, output_file=None
             }
         ''' % (acquisition, Constants.NIDM_PARTICIPANT, Constants.NIDM_SUBJECTID)
 
-    df = sparql_query_nidm(nidm_file_list, query, output_file=output_file)
-
-    return df
+    return sparql_query_nidm(nidm_file_list, query, output_file=output_file)
 
 
 def GetParticipantDetails(nidm_file_list,project_id, participant_id, output_file=None):
@@ -531,7 +529,7 @@ def GetParticipantInstrumentDataCached(nidm_file_list: tuple ,project_id, partic
     for f in nidm_file_list:
         rdf_graph = OpenGraph(f)
         for n in rdf_graph.namespace_manager.namespaces():
-            if not n in names:
+            if n not in names:
                 names.append(n)
 
     isa = URIRef('http://www.w3.org/1999/02/22-rdf-syntax-ns#type')
@@ -542,21 +540,21 @@ def GetParticipantInstrumentDataCached(nidm_file_list: tuple ,project_id, partic
             # verify that the assessment is linked to a subject through a blank node
             for blanknode in rdf_graph.objects(subject=acquisition,predicate=Constants.PROV['qualifiedAssociation']):
                 # check to see if this assessment is about our participant
-                if ((blanknode, Constants.PROV['agent'], participant_id) in rdf_graph)  :
+                if ((blanknode, Constants.PROV['agent'], participant_id) in rdf_graph):
                     # now we know that the assessment is one we want, find the actual assessment data
                     for instrument in rdf_graph.subjects(predicate=Constants.PROV['wasGeneratedBy'], object=acquisition):
                         #load up all the assement data into the result
                         instrument_key = str(instrument).split('/')[-1]
                         result[instrument_key] = {}
                         for s,data_element,o in rdf_graph.triples((instrument, None, None)):
-                            # convert the random looking URIs to the prefix used in the ttl file, if any
-                            matches = [n[0] for n in names if n[1] == data_element]
-                            if len(matches) > 0:
+                            if matches := [
+                                n[0] for n in names if n[1] == data_element
+                            ]:
                                 idx = str(matches[0])
                             else:
                                 # idx = str(data_element)
                                 idx = GetNameForDataElement(rdf_graph, data_element)
-                            result[instrument_key][ idx ] = str(str(o))
+                            result[instrument_key][ idx ] = str(o)
 
 
     return result
@@ -582,11 +580,7 @@ def GetParticipantUUIDsForProjectCached(nidm_file_list:tuple, project_id, filter
 
     ### added by DBK changed to dictionary to support subject ids along with uuids
     #participants = []
-    participants = {}
-    participants["uuid"] = []
-    participants["subject id"] = []
-
-
+    participants = {"uuid": [], "subject id": []}
     for file in nidm_file_list:
         rdf_graph = OpenGraph(file)
         #find all the sessions
@@ -597,26 +591,29 @@ def GetParticipantUUIDsForProjectCached(nidm_file_list:tuple, project_id, filter
                 for activity in rdf_graph.subjects(predicate=Constants.DCT['isPartOf'], object=session):
                     # look to see if the activity is linked to a subject via blank node
                     for blank in rdf_graph.objects(subject=activity, predicate=Constants.PROV['qualifiedAssociation']):
-                        if (blank, Constants.PROV['hadRole'], Constants.SIO['Subject']):
-                            for participant in rdf_graph.objects(subject=blank, predicate=Constants.PROV['agent']):
-                                uuid = (str(participant)).split('/')[-1]  # strip off the http://whatever/whatever/
-                                if (not uuid in participants) and \
-                                        ( (not filter) or CheckSubjectMatchesFilter( tuple([file]) , project, participant, filter) ):
+                        for participant in rdf_graph.objects(subject=blank, predicate=Constants.PROV['agent']):
+                            uuid = (str(participant)).split('/')[-1]  # strip off the http://whatever/whatever/
+                            if uuid not in participants and (
+                                not filter
+                                or CheckSubjectMatchesFilter(
+                                    (file,), project, participant, filter
+                                )
+                            ):
                                     ### added by DBK for subject IDs as well ###
-                                    for id in rdf_graph.objects(subject=participant,predicate=URIRef(Constants.NIDM_SUBJECTID.uri)):
-                                        subid = (str(id)).split('/')[-1]  # strip off the http://whatever/whatever/
+                                for id in rdf_graph.objects(subject=participant,predicate=URIRef(Constants.NIDM_SUBJECTID.uri)):
+                                    subid = (str(id)).split('/')[-1]  # strip off the http://whatever/whatever/
 
                                         ### added by DBK for subject IDs as well ###
                                         #participants.append(uuid)
-                                        if ( not uuid in participants['uuid'] ):
-                                            try:
-                                                participants['uuid'].append(uuid)
-                                                participants['subject id'].append(subid)
-                                            # just in case there's no subject id in the file...
-                                            except:
-                                                #participants.append(uuid)
-                                                participants['uuid'].append(uuid)
-                                                participants['subject id'].append('')
+                                    if uuid not in participants['uuid']:
+                                        try:
+                                            participants['uuid'].append(uuid)
+                                            participants['subject id'].append(subid)
+                                        # just in case there's no subject id in the file...
+                                        except:
+                                            #participants.append(uuid)
+                                            participants['uuid'].append(uuid)
+                                            participants['subject id'].append('')
 
     return participants
 
@@ -648,9 +645,17 @@ def getProjectAcquisitionObjects(nidm_file_list, project_id):
             if str(project) == project_uuid:
                 for (session,p2,o2) in rdf_graph.triples((None,isa, Constants.NIDM['Session'])):
                     for (acquisition,p3,o3) in rdf_graph.triples((None, Constants.DCT['isPartOf'], session)):
-                        for (acq_obj, p4, o4) in rdf_graph.triples((None, Constants.PROV['wasGeneratedBy'], acquisition)):
-                            if (acq_obj, isa, Constants.NIDM['AcquisitionObject']):
-                                acq_objects.append(acq_obj)
+                        acq_objects.extend(
+                            acq_obj
+                            for acq_obj, p4, o4 in rdf_graph.triples(
+                                (
+                                    None,
+                                    Constants.PROV['wasGeneratedBy'],
+                                    acquisition,
+                                )
+                            )
+                        )
+
     return acq_objects
 
 @functools.lru_cache(maxsize=LARGEST_CACHE_SIZE)
@@ -670,24 +675,33 @@ def GetDatatypeSynonyms(nidm_file_list, project_id, datatype):
     if datatype.startswith("derivatives."):
         datatype = datatype[12:]
     project_data_elements = GetProjectDataElements(nidm_file_list, project_id)
-    all_synonyms = set([datatype])
+    all_synonyms = {datatype}
     for dti in project_data_elements['data_type_info']:
         #modified by DBK 7/25/2022
         # if str(datatype) in [ str(x) for x in [dti['source_variable'], dti['label'], dti['datumType'], dti['measureOf'], URITail(dti['measureOf']), str(dti['isAbout']), URITail(dti['isAbout']), dti['dataElement'], dti['dataElementURI'], dti['prefix']] ]:
         if (any(str(datatype) in str(x) for x in
             [dti['source_variable'], dti['label'], dti['datumType'], dti['measureOf'], URITail(dti['measureOf']),
              str(dti['isAbout']), URITail(dti['isAbout']), dti['dataElement'], dti['dataElementURI'], dti['prefix']])):
-            all_synonyms = all_synonyms.union(set([str(dti['source_variable']), str(dti['label']), str(dti['datumType']), str(dti['measureOf']), URITail(dti['measureOf']), str(dti['isAbout']), str(dti['dataElement']), str(dti['dataElementURI'])] ))
+            all_synonyms = all_synonyms.union(
+                {
+                    str(dti['source_variable']),
+                    str(dti['label']),
+                    str(dti['datumType']),
+                    str(dti['measureOf']),
+                    URITail(dti['measureOf']),
+                    str(dti['isAbout']),
+                    str(dti['dataElement']),
+                    str(dti['dataElementURI']),
+                }
+            )
+
             all_synonyms.remove("")  # remove the empty string in case that is in there
     return all_synonyms
 
 def GetProjectDataElements(nidm_file_list, project_id):
     ### added by DBK...changing to dictionary to support labels along with uuids
     #result = []
-    result = {}
-    result["uuid"] = []
-    result['label']= []
-    result['data_type_info'] = []
+    result = {"uuid": [], 'label': [], 'data_type_info': []}
     isa = URIRef('http://www.w3.org/1999/02/22-rdf-syntax-ns#type')
 
     # if this isn't already a URI, make it one.
@@ -726,8 +740,7 @@ def GetProjectDataElements(nidm_file_list, project_id):
                 cde_set = set()
                 for stat_collection in rdf_graph.subjects(isa, Constants.NIDM['FSStatsCollection']):
                     for predicate in rdf_graph.predicates(subject=stat_collection):
-                        dti = getDataTypeInfo(None, predicate)
-                        if dti:
+                        if dti := getDataTypeInfo(None, predicate):
                             cde_tuple = (predicate,  dti["label"])
                             cde_set.add( cde_tuple )
 
@@ -744,7 +757,7 @@ def GetProjectDataElements(nidm_file_list, project_id):
 def splitSubject(subject):
     if subject.find("http") > -1:
         matches = re.match(r'.*(https?://[^/]+[^\. ]+)', subject)
-        URI = matches.group(1)
+        URI = matches[1]
         subject = str(subject).replace(URI, URITail(URI))
 
     return subject.split(".")
@@ -779,7 +792,7 @@ def CheckSubjectMatchesFilter(nidm_file_list, project_uuid, subject_uuid, filter
     '''
 
 
-    if filter == None:
+    if filter is None:
         return True
 
     # filter can have multiple and clauses, break them up and test each one
@@ -884,9 +897,9 @@ def GetProjectsMetadata(nidm_file_list):
         value = str(row[1])
         project = str(row[2])
         if project not in projects:
-            projects[str(project)] = {}
+            projects[project] = {}
         # if field in field_whitelist:
-        projects[str(project)][field] = value
+        projects[project][field] = value
 
     return {'projects': compressForJSONResponse(projects)}
 
@@ -914,8 +927,7 @@ def GetDataElements(nidm_file_list):
 
             }'''
 
-    df = sparql_query_nidm(nidm_file_list.split(','), query, output_file=None)
-    return df
+    return sparql_query_nidm(nidm_file_list.split(','), query, output_file=None)
 def GetBrainVolumeDataElements(nidm_file_list):
     query='''
         prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -963,7 +975,7 @@ def GetBrainVolumeDataElements(nidm_file_list):
     # now let's strip off the
     for index, row in df.iterrows():
         tmp = row['element_id']
-        row['element_id'] = re.search(r'(.*)/(.*)',tmp).group(2)
+        row['element_id'] = re.search(r'(.*)/(.*)',tmp)[2]
     return df
 
 def GetBrainVolumes(nidm_file_list):
@@ -1004,8 +1016,7 @@ def GetBrainVolumes(nidm_file_list):
             }
             '''
 
-    df = sparql_query_nidm(nidm_file_list.split(','), query, output_file=None)
-    return df
+    return sparql_query_nidm(nidm_file_list.split(','), query, output_file=None)
 
 
 
@@ -1019,9 +1030,8 @@ def expandNIDMAbbreviation(shortKey) -> str:
     :return:
     '''
     newkey = skey = str(shortKey)
-    match = re.search(r"^([^:]+):([^:]+)$", skey)
-    if match:
-        newkey = Constants.namespaces[match.group(1)] + match.group(2)
+    if match := re.search(r"^([^:]+):([^:]+)$", skey):
+        newkey = Constants.namespaces[match[1]] + match[2]
     return newkey
 
 def compressForJSONResponse(data) -> dict:
@@ -1032,15 +1042,14 @@ def compressForJSONResponse(data) -> dict:
     :param data: Data to seach for long URIs that can be replaced with prefixes
     :return: Dictionary
     '''
-    new_dict = {}
-
-    if isinstance(data,dict):
-        for key, value in data.items():
-            new_dict[matchPrefix(key)] = compressForJSONResponse(value)
-    else:
-        return data
-
-    return new_dict
+    return (
+        {
+            matchPrefix(key): compressForJSONResponse(value)
+            for key, value in data.items()
+        }
+        if isinstance(data, dict)
+        else data
+    )
 
 def matchPrefix(possible_URI, short=False) -> str:
     '''
@@ -1053,14 +1062,10 @@ def matchPrefix(possible_URI, short=False) -> str:
     '''
     for k, n in Constants.namespaces.items():
         if possible_URI.startswith(n):
-            if short:
-                return k
-            else:
-                return "{}:{}".format(k, possible_URI.replace(n, ""))
-
+            return k if short else f'{k}:{possible_URI.replace(n, "")}'
     # also check the prov prefix
     if possible_URI.startswith("http://www.w3.org/ns/prov#"):
-        return "{}:{}".format("prov", possible_URI.replace("http://www.w3.org/ns/prov#", ""))
+        return f'prov:{possible_URI.replace("http://www.w3.org/ns/prov#", "")}'
 
     return possible_URI
 
@@ -1073,13 +1078,10 @@ def activityIsSWAgent(rdf_graph, activity, sw_agents):
     :param sw_agents: array of software agent URIs
     :return: Boolean
     '''
-    if activity in sw_agents:
-        return True
-
-    return False
+    return activity in sw_agents
 
 @functools.lru_cache(maxsize=QUERY_CACHE_SIZE)
-def getDerivativesNodesForSubject (rdf_graph, subject):
+def getDerivativesNodesForSubject(rdf_graph, subject):
     '''
     Finds all the URIs that were generated by software agents and linked to the subject
 
@@ -1104,8 +1106,16 @@ def getDerivativesNodesForSubject (rdf_graph, subject):
                     for software_agent in rdf_graph.objects(subject=software_blank, predicate=Constants.PROV['agent']):
                         if activityIsSWAgent(rdf_graph, software_agent, sw_agents):
                             # now we know our activity generated a stats colleciton, so go find it (the stats_colleciton will be generated by the activity)
-                            for stats_collection in rdf_graph.subjects(predicate=Constants.PROV['wasGeneratedBy'], object=activity):
-                                derivatives_uris.append(stats_collection)
+                            derivatives_uris.extend(
+                                iter(
+                                    rdf_graph.subjects(
+                                        predicate=Constants.PROV[
+                                            'wasGeneratedBy'
+                                        ],
+                                        object=activity,
+                                    )
+                                )
+                            )
 
     return derivatives_uris
 
@@ -1169,19 +1179,30 @@ def getDataTypeInfo(source_graph, datatype):
         if (re.search(r'isAbout$', str(p), flags=re.IGNORECASE) != None):
             isAbout = o
 
-    possible_prefix = [x for x in rdf_graph.namespaces() if expanded_datatype.startswith(x[1])]
-    if (len(possible_prefix) > 0):
+    if possible_prefix := [
+        x for x in rdf_graph.namespaces() if expanded_datatype.startswith(x[1])
+    ]:
         prefix = possible_prefix[0][0]
 
 
-    if not found:
-        return False
-    else:
-        return {'label': label, 'hasUnit': hasUnit, 'datumType': typeURI, 'measureOf': measureOf, 'isAbout': isAbout,
-                'dataElement': str(URITail(s)), 'dataElementURI': s, 'description': description, 'prefix': prefix,
-                'source_variable': source_variable}
+    return (
+        {
+            'label': label,
+            'hasUnit': hasUnit,
+            'datumType': typeURI,
+            'measureOf': measureOf,
+            'isAbout': isAbout,
+            'dataElement': str(URITail(s)),
+            'dataElementURI': s,
+            'description': description,
+            'prefix': prefix,
+            'source_variable': source_variable,
+        }
+        if found
+        else False
+    )
 
-def getStatsCollectionForNode (rdf_graph, derivatives_node):
+def getStatsCollectionForNode(rdf_graph, derivatives_node):
 
     isa = URIRef('http://www.w3.org/1999/02/22-rdf-syntax-ns#type')
     data = {'URI': derivatives_node, 'values': {}}
@@ -1189,10 +1210,8 @@ def getStatsCollectionForNode (rdf_graph, derivatives_node):
     for s, datatype, value in rdf_graph.triples((derivatives_node, None, None)):
         if datatype == isa and str(value).find('http://purl.org/nidash/nidm#') == 0:
             data['StatCollectionType'] = str(value)[28:]
-        else:
-            dti = getDataTypeInfo(rdf_graph, datatype )
-            if dti:  # if we can't find a datatype then this is non-data info so don't record it
-                data['values'][str(datatype)] = {'datumType': str(dti['datumType']), 'label': str(dti['label']), 'value': str(value), 'units': str(dti['hasUnit']), 'isAbout': str(dti['isAbout'])}
+        elif dti := getDataTypeInfo(rdf_graph, datatype):
+            data['values'][str(datatype)] = {'datumType': str(dti['datumType']), 'label': str(dti['label']), 'value': str(value), 'units': str(dti['hasUnit']), 'isAbout': str(dti['isAbout'])}
 
     return data
 
@@ -1218,10 +1237,10 @@ def OpenGraph(file):
         try:
             f = open(file)
             data = f.read()
-            logging.debug("Sending {} to blazegraph".format(file))
+            logging.debug(f"Sending {file} to blazegraph")
             r = requests.post(url=environ['BLAZEGRAPH_URL'], data=data, headers={'Content-type': 'application/x-turtle'})
         except Exception as e:
-            logging.error("Exception {} loading {} into Blazegraph.".format(e, file))
+            logging.error(f"Exception {e} loading {file} into Blazegraph.")
 
 
     BLOCKSIZE = 65536
@@ -1233,7 +1252,7 @@ def OpenGraph(file):
             buf = afile.read(BLOCKSIZE)
     hash = hasher.hexdigest()
 
-    pickle_file = '{}/rdf_graph.{}.pickle'.format( tempfile.gettempdir(), hash)
+    pickle_file = f'{tempfile.gettempdir()}/rdf_graph.{hash}.pickle'
     if path.isfile(pickle_file):
         return pickle.load(open(pickle_file, "rb"))
 
@@ -1287,20 +1306,15 @@ def getSoftwareAgents(rdf_graph):
 
     isa = URIRef('http://www.w3.org/1999/02/22-rdf-syntax-ns#type')
     software_agent = URIRef('http://www.w3.org/ns/prov#SoftwareAgent')
-    agents = []
-
-    for s,o,p in rdf_graph.triples( (None, isa, software_agent) ):
-        agents.append(s)
-
-    return agents
+    return [s for s, o, p in rdf_graph.triples( (None, isa, software_agent) )]
 
 def download_cde_files():
-        cde_dir = tempfile.gettempdir()
+    cde_dir = tempfile.gettempdir()
 
-        for url in Constants.CDE_FILE_LOCATIONS:
-            urlretrieve(url, "{}/{}".format(cde_dir, url.split('/')[-1]))
+    for url in Constants.CDE_FILE_LOCATIONS:
+        urlretrieve(url, f"{cde_dir}/{url.split('/')[-1]}")
 
-        return cde_dir
+    return cde_dir
 
 def getCDEs(file_list=None):
 
@@ -1311,7 +1325,7 @@ def getCDEs(file_list=None):
     hasher.update(str(file_list).encode('utf-8'))
     h = hasher.hexdigest()
 
-    cache_file_name = tempfile.gettempdir() + "/cde_graph.{}.pickle".format(h)
+    cache_file_name = tempfile.gettempdir() + f"/cde_graph.{h}.pickle"
 
     if path.isfile(cache_file_name):
         rdf_graph = pickle.load(open(cache_file_name, "rb"))
@@ -1322,10 +1336,7 @@ def getCDEs(file_list=None):
 
     if not file_list:
 
-        cde_dir = ''
-        if "CDE_DIR" in os.environ:
-            cde_dir = os.environ['CDE_DIR']
-
+        cde_dir = os.environ['CDE_DIR'] if "CDE_DIR" in os.environ else ''
         if (not cde_dir) and (os.path.isfile( '/opt/project/nidm/core/cde_dir/ants_cde.ttl' )):
             cde_dir = '/opt/project/nidm/core/cde_dir'
 
@@ -1335,7 +1346,7 @@ def getCDEs(file_list=None):
         # TODO: the list of file names should be it's own constant or derived from CDE_FILE_LOCATIONS
         file_list = [ ]
         for f in ['ants_cde.ttl', 'fs_cde.ttl', 'fsl_cde.ttl']:
-            fname = '{}/{}'.format(cde_dir, f)
+            fname = f'{cde_dir}/{f}'
             if os.path.isfile( fname ):
                 file_list.append( fname )
 
@@ -1349,10 +1360,8 @@ def getCDEs(file_list=None):
 
 
 
-    cache_file = open(cache_file_name , 'wb')
-    pickle.dump(rdf_graph, cache_file)
-    cache_file.close()
-
+    with open(cache_file_name , 'wb') as cache_file:
+        pickle.dump(rdf_graph, cache_file)
     getCDEs.cache = rdf_graph
     return rdf_graph
 getCDEs.cache = None

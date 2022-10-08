@@ -186,10 +186,7 @@ def test_map_vars_to_terms_BIDS():
         }'''
     qres=cde.query(query)
 
-    results=[]
-    for row in qres:
-        results.append(list(row))
-
+    results = [list(row) for row in qres]
     assert len(results) == 20
 
 
@@ -251,10 +248,7 @@ def test_map_vars_to_terms_reproschema():
         }'''
     qres = cde.query(query)
 
-    results = []
-    for row in qres:
-        results.append(list(row))
-
+    results = [list(row) for row in qres]
     assert len(results) == 20
 
 

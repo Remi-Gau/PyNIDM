@@ -41,16 +41,9 @@ class Project(pm.ProvActivity,Core):
         else:
             self.graph = Constants.NIDMDocument(namespaces=Constants.namespaces)
 
-        if uuid is None:
-            self._uuid = getUUID()
-
-            #execute default parent class constructor
-            super(Project,self).__init__(self.graph, pm.QualifiedName(pm.Namespace("niiri",Constants.NIIRI),self.get_uuid()),attributes)
-        else:
-            self._uuid = uuid
-            #execute default parent class constructor
-            super(Project,self).__init__(self.graph, pm.QualifiedName(pm.Namespace("niiri",Constants.NIIRI),self.get_uuid()),attributes)
-
+        self._uuid = getUUID() if uuid is None else uuid
+        #execute default parent class constructor
+        super(Project,self).__init__(self.graph, pm.QualifiedName(pm.Namespace("niiri",Constants.NIIRI),self.get_uuid()),attributes)
         #add record to graph
         self.graph._add_record(self)
         #create empty sessions list
@@ -88,13 +81,12 @@ class Project(pm.ProvActivity,Core):
         """
         if session in self._sessions:
             return False
-        else:
-            #add session to self.sessions list
-            self._sessions.extend([session])
-            #create links in graph
-            #session.add_attributes({str("dct:isPartOf"):self})
-            session.add_attributes({pm.QualifiedName(pm.Namespace("dct",Constants.DCT),'isPartOf'):self})
-            return True
+        #add session to self.sessions list
+        self._sessions.extend([session])
+        #create links in graph
+        #session.add_attributes({str("dct:isPartOf"):self})
+        session.add_attributes({pm.QualifiedName(pm.Namespace("dct",Constants.DCT),'isPartOf'):self})
+        return True
     def get_sessions(self):
         return self._sessions
 
@@ -112,13 +104,12 @@ class Project(pm.ProvActivity,Core):
         """
         if derivative in self._derivatives:
             return False
-        else:
-            # add session to self.sessions list
-            self._derivatives.extend([derivative])
-            # create links in graph
-            # session.add_attributes({str("dct:isPartOf"):self})
-            derivative.add_attributes({pm.QualifiedName(pm.Namespace("dct", Constants.DCT), 'isPartOf'): self})
-            return True
+        # add session to self.sessions list
+        self._derivatives.extend([derivative])
+        # create links in graph
+        # session.add_attributes({str("dct:isPartOf"):self})
+        derivative.add_attributes({pm.QualifiedName(pm.Namespace("dct", Constants.DCT), 'isPartOf'): self})
+        return True
 
     def add_dataelements(self, dataelement):
         """
@@ -128,13 +119,12 @@ class Project(pm.ProvActivity,Core):
         """
         if dataelement in self._dataelements:
             return False
-        else:
-            # add session to self.sessions list
-            self._dataelements.extend([dataelement])
-            # create links in graph
-            # session.add_attributes({str("dct:isPartOf"):self})
-            #dataelement.add_attributes({pm.QualifiedName(pm.Namespace("dct", Constants.DCT), 'isPartOf'): self})
-            return True
+        # add session to self.sessions list
+        self._dataelements.extend([dataelement])
+        # create links in graph
+        # session.add_attributes({str("dct:isPartOf"):self})
+        #dataelement.add_attributes({pm.QualifiedName(pm.Namespace("dct", Constants.DCT), 'isPartOf'): self})
+        return True
 
     def __str__(self):
         return "NIDM-Experiment Project Class"

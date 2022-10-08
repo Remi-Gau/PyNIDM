@@ -53,9 +53,6 @@ from nidm.experiment.tools.click_base import cli
               help="If parameter set then NIDM file will be exported as JSONLD")
 @click.option("--outdir", "-out", required=False,
               help="Optional directory to save converted NIDM file")
-
-
-
 def convert(nidm_file_list, type,outdir):
     """
     This function will convert NIDM files to various RDF-supported formats and name then / put them in the same
@@ -74,27 +71,27 @@ def convert(nidm_file_list, type,outdir):
             # read in nidm file
             project = read_nidm(nidm_file)
             #write jsonld file with same name
-            with open(outfile + ".json", 'w') as f:
+            with open(f"{outfile}.json", 'w') as f:
                 f.write(project.serializeJSONLD())
         elif type == 'turtle':
             #graph = Graph()
             #graph.parse(nidm_file, format=util.guess_format(nidm_file))
             #graph.serialize(splitext(nidm_file)[0] + ".ttl", format='turtle')
             project = read_nidm(nidm_file)
-            with open(outfile + ".ttl", 'w') as f:
+            with open(f"{outfile}.ttl", 'w') as f:
                 f.write(project.serializeTurtle())
         elif type == 'xml-rdf':
             graph = Graph()
             graph.parse(nidm_file, format=util.guess_format(nidm_file))
-            graph.serialize(outfile + ".xml", format='pretty-xml')
+            graph.serialize(f"{outfile}.xml", format='pretty-xml')
         elif type == 'n3':
             graph = Graph()
             graph.parse(nidm_file, format=util.guess_format(nidm_file))
-            graph.serialize(outfile + ".n3", format='n3')
+            graph.serialize(f"{outfile}.n3", format='n3')
         elif type == 'trig':
             # read in nidm file
             project = read_nidm(nidm_file)
-            with open(outfile + ".trig", 'w') as f:
+            with open(f"{outfile}.trig", 'w') as f:
                 f.write(project.serializeTrig())
         else:
             print("Error, type is not supported at this time")

@@ -9,8 +9,8 @@ from uuid import UUID
 
 
 USE_GITHUB_DATA = True
-BRAIN_VOL_FILES = tuple(['./cmu_a.nidm.ttl', './caltech.nidm.ttl'])
-OPENNEURO_FILES = tuple(['ds000110.nidm.ttl'])
+BRAIN_VOL_FILES = './cmu_a.nidm.ttl', './caltech.nidm.ttl'
+OPENNEURO_FILES = ('ds000110.nidm.ttl', )
 PROJECT_URI = None
 OPENNEURO_PROJECT_URI = None
 

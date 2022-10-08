@@ -78,7 +78,7 @@ def valid_qualified_name(bundle, value, xsd_qname=False):
     if value is None:
         return None
     qualified_name = bundle.valid_qualified_name(value)
-    return qualified_name if not xsd_qname else XSD_QNAME(qualified_name)
+    return XSD_QNAME(qualified_name) if xsd_qname else qualified_name
 
 
 class ProvONERDFSerializer(Serializer):
@@ -98,34 +98,19 @@ class ProvONERDFSerializer(Serializer):
         newargs = kwargs.copy()
         newargs['format'] = rdf_format
 
-        if six.PY2:
-            buf = io.BytesIO()
-            try:
-                container.serialize(buf, **newargs)
-                buf.seek(0, 0)
-                # Right now this is a bytestream. If the object to stream to is
-                # a text object is must be decoded. We assume utf-8 here which
-                # should be fine for almost every case.
-                if isinstance(stream, io.TextIOBase):
-                    stream.write(buf.read().decode('utf-8'))
-                else:
-                    stream.write(buf.read())
-            finally:
-                buf.close()
-        else:
-            buf = io.BytesIO()
-            try:
-                container.serialize(buf, **newargs)
-                buf.seek(0, 0)
-                # Right now this is a bytestream. If the object to stream to is
-                # a text object is must be decoded. We assume utf-8 here which
-                # should be fine for almost every case.
-                if isinstance(stream, io.TextIOBase):
-                    stream.write(buf.read().decode('utf-8'))
-                else:
-                    stream.write(buf.read())
-            finally:
-                buf.close()
+        buf = io.BytesIO()
+        try:
+            container.serialize(buf, **newargs)
+            buf.seek(0, 0)
+            # Right now this is a bytestream. If the object to stream to is
+            # a text object is must be decoded. We assume utf-8 here which
+            # should be fine for almost every case.
+            if isinstance(stream, io.TextIOBase):
+                stream.write(buf.read().decode('utf-8'))
+            else:
+                stream.write(buf.read())
+        finally:
+            buf.close()
 
     def deserialize(self, stream, rdf_format='trig', **kwargs):
         """
@@ -179,15 +164,14 @@ class ProvONERDFSerializer(Serializer):
             if datatype == XSD['gYear']:
                 return pm.Literal(dateutil.parser.parse(literal).year,
                                   datatype=self.valid_identifier(datatype))
-            if datatype == XSD['gYearMonth']:
-                parsed_info = dateutil.parser.parse(literal)
-                return pm.Literal('{0}-{1:02d}'.format(parsed_info.year, parsed_info.month),
-                                  datatype=self.valid_identifier(datatype))
-            else:
+            if datatype != XSD['gYearMonth']:
                 # The literal of standard Python types is not converted here
                 # It will be automatically converted when added to a record by
                 # _auto_literal_conversion()
                 return pm.Literal(value, self.valid_identifier(datatype), langtag)
+            parsed_info = dateutil.parser.parse(literal)
+            return pm.Literal('{0}-{1:02d}'.format(parsed_info.year, parsed_info.month),
+                              datatype=self.valid_identifier(datatype))
         elif isinstance(literal, URIRef):
             rval = self.valid_identifier(literal)
             if rval is None:
@@ -218,7 +202,7 @@ class ProvONERDFSerializer(Serializer):
 
         id_generator = AnonymousIDGenerator()
         real_or_anon_id = lambda record: record._identifier.uri if \
-            record._identifier else id_generator.get_anon_id(record)
+                record._identifier else id_generator.get_anon_id(record)
 
         for record in bundle._records:
             rec_type = record.get_type()
@@ -232,11 +216,14 @@ class ProvONERDFSerializer(Serializer):
                 formal_objects = []
                 used_objects = []
                 all_attributes = list(record.formal_attributes) + list(record.attributes)
-                formal_qualifiers = False
-                for attrid, (attr, value) in enumerate(list(record.formal_attributes)):
-                    if (identifier is not None and value is not None) or \
-                            (identifier is None and value is not None and attrid > 1):
-                        formal_qualifiers = True
+                formal_qualifiers = any(
+                    (identifier is not None and value is not None)
+                    or (identifier is None and value is not None and attrid > 1)
+                    for attrid, (attr, value) in enumerate(
+                        list(record.formal_attributes)
+                    )
+                )
+
                 has_qualifiers = len(record.extra_attributes) > 0 or formal_qualifiers
                 for idx, (attr, value) in enumerate(all_attributes):
                     if record.is_relation():
@@ -289,17 +276,18 @@ class ProvONERDFSerializer(Serializer):
                                 qualifier = rec_type._localpart
                                 rec_uri = rec_type.uri
                                 for attr_name, val in record.extra_attributes:
-                                    if attr_name == PROV['type']:
-                                        if PROV['Revision'] == val or \
-                                              PROV['Quotation'] == val or \
-                                                PROV['PrimarySource'] == val:
-                                            qualifier = val._localpart
-                                            rec_uri = val.uri
-                                            if identifier is not None:
-                                                container.remove((identifier,
-                                                                  RDF.type,
-                                                                  URIRef(rec_type.uri)))
-                                QRole = URIRef(PROV['qualified' + qualifier].uri)
+                                    if attr_name == PROV['type'] and (
+                                        PROV['Revision'] == val
+                                        or PROV['Quotation'] == val
+                                        or PROV['PrimarySource'] == val
+                                    ):
+                                        qualifier = val._localpart
+                                        rec_uri = val.uri
+                                        if identifier is not None:
+                                            container.remove((identifier,
+                                                              RDF.type,
+                                                              URIRef(rec_type.uri)))
+                                QRole = URIRef(PROV[f'qualified{qualifier}'].uri)
                                 if identifier is not None:
                                     container.add((subj, QRole, identifier))
                                 else:
@@ -330,11 +318,11 @@ class ProvONERDFSerializer(Serializer):
                             if PROV['responsible'].uri in pred:
                                 pred = URIRef(PROV['agent'].uri)
                             if rec_type == PROV_DELEGATION and \
-                                            PROV['activity'].uri in pred:
+                                                PROV['activity'].uri in pred:
                                 pred = URIRef(PROV['hadActivity'].uri)
                             if (rec_type in [PROV_END, PROV_START] and
                                             PROV['trigger'].uri in pred) or\
-                                (rec_type in [PROV_USAGE] and
+                                    (rec_type in [PROV_USAGE] and
                                          PROV['used'].uri in pred):
                                 pred = URIRef(PROV['entity'].uri)
                             if rec_type in [PROV_GENERATION, PROV_END,
@@ -374,13 +362,8 @@ class ProvONERDFSerializer(Serializer):
                         obj = self.encode_rdf_representation(value)
                     if attr == PROV['location']:
                         pred = URIRef(PROV['atLocation'].uri)
-                        if False and isinstance(value, (URIRef, pm.QualifiedName)):
-                            if isinstance(value, pm.QualifiedName):
-                                value = URIRef(value.uri)
-                            container.add((identifier, pred, value))
-                        else:
-                            container.add((identifier, pred,
-                                           self.encode_rdf_representation(obj)))
+                        container.add((identifier, pred,
+                                       self.encode_rdf_representation(obj)))
                         continue
                     if attr == PROV['type']:
                         pred = RDF.type

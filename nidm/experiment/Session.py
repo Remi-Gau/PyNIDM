@@ -28,15 +28,9 @@ class Session(pm.ProvActivity,Core):
         :return: none
 
         """
-        if uuid is None:
-            self._uuid = getUUID()
-            #execute default parent class constructor
-            super(Session,self).__init__(project.graph, pm.QualifiedName(pm.Namespace("niiri",Constants.NIIRI),self.get_uuid()),attributes)
-        else:
-            self._uuid = uuid
-            #execute default parent class constructor
-            super(Session,self).__init__(project.graph, pm.QualifiedName(pm.Namespace("niiri",Constants.NIIRI),self.get_uuid()),attributes)
-
+        self._uuid = getUUID() if uuid is None else uuid
+        #execute default parent class constructor
+        super(Session,self).__init__(project.graph, pm.QualifiedName(pm.Namespace("niiri",Constants.NIIRI),self.get_uuid()),attributes)
         project.graph._add_record(self)
 
         if add_default_type:
@@ -59,13 +53,10 @@ class Session(pm.ProvActivity,Core):
         :param uuid: full uuid of acquisition
         :return: True if exists, False otherwise
         '''
-        #print("Query uuid: %s" %uuid)
-        for acquisitions in self._acquisitions:
-            #print(acquisitions._identifier._localpart)
-            if str(uuid) == acquisitions._identifier._localpart:
-                return True
-
-        return False
+        return any(
+            str(uuid) == acquisitions._identifier._localpart
+            for acquisitions in self._acquisitions
+        )
     def __str__(self):
         return "NIDM-Experiment Session Class"
 

@@ -28,15 +28,9 @@ class Acquisition(pm.ProvActivity,Core):
         :param attributes: optional dictionary of attributes to add qname:value
 
         """
-        if uuid is None:
-            self._uuid = getUUID()
-
-            #execute default parent class constructor
-            super(Acquisition,self).__init__(session.graph, pm.QualifiedName(pm.Namespace("niiri",Constants.NIIRI),self.get_uuid()),attributes)
-        else:
-            self._uuid = uuid
-            super(Acquisition,self).__init__(session.graph, pm.QualifiedName(pm.Namespace("niiri",Constants.NIIRI),self.get_uuid()),attributes)
-
+        self._uuid = getUUID() if uuid is None else uuid
+        #execute default parent class constructor
+        super(Acquisition,self).__init__(session.graph, pm.QualifiedName(pm.Namespace("niiri",Constants.NIIRI),self.get_uuid()),attributes)
         session.graph._add_record(self)
 
         if add_default_type:
@@ -72,10 +66,7 @@ class Acquisition(pm.ProvActivity,Core):
         :param uuid: full uuid of acquisition
         :return: True if exists, False otherwise
         '''
-        if uuid in self._acquisition_objects:
-            return True
-        else:
-            return False
+        return uuid in self._acquisition_objects
 
     def __str__(self):
         return "NIDM-Experiment Acquisition Class"

@@ -61,24 +61,20 @@ def call_click_command(cmd, *args, **kwargs):
     for name in kwargs:
         if name in opts:
             arg_values[name] = kwargs[name]
+        elif name in args_needed:
+            arg_values[name] = kwargs[name]
+            del args_needed[name]
         else:
-            if name in args_needed:
-                arg_values[name] = kwargs[name]
-                del args_needed[name]
-            else:
-                raise click.BadParameter(
-                    "Unknown keyword argument '{}'".format(name))
+            raise click.BadParameter(f"Unknown keyword argument '{name}'")
 
 
     # check positional arguments list
     for arg in (a for a in cmd.params if isinstance(a, click.Argument)):
         if arg.name not in arg_values:
-            raise click.BadParameter("Missing required positional"
-                                     "parameter '{}'".format(arg.name))
+            raise click.BadParameter(f"Missing required positionalparameter '{arg.name}'")
 
     # build parameter lists
-    opts_list = sum(
-        [[o.opts[0], arg_values[n]] for n, o in opts.items()], [])
+    opts_list = sum(([o.opts[0], arg_values[n]] for n, o in opts.items()), [])
     args_list = [str(v) for n, v in arg_values.items() if n not in opts]
 
     # call the command
@@ -102,12 +98,11 @@ def test_simple_model():
                       ctr=None,regularization=None,output_file="output.txt"))
 
     call_click_command(linear_regression,*arguments,**arguments)
-   
+
 
     if os.path.exists("output.txt"):
-        fp = open("output.txt", "r")
-        out = fp.read()
-        fp.close()
+        with open("output.txt", "r") as fp:
+            out = fp.read()
         os.remove("output.txt")
 
 
@@ -134,9 +129,8 @@ def test_model_with_contrasts():
 
 
     if os.path.exists('output.txt'):
-        fp = open('output.txt', "r")
-        out = fp.read()
-        fp.close()
+        with open('output.txt', "r") as fp:
+            out = fp.read()
         os.remove('output.txt')
 
     # print(out)
@@ -170,9 +164,8 @@ def test_model_with_contrasts_reg_L1():
     call_click_command(linear_regression, *arguments, **arguments)
 
     if os.path.exists('output.txt'):
-        fp = open('output.txt', "r")
-        out = fp.read()
-        fp.close()
+        with open('output.txt', "r") as fp:
+            out = fp.read()
         os.remove('output.txt')
 
     print(out)
@@ -200,9 +193,8 @@ def test_model_with_contrasts_reg_L2():
     call_click_command(linear_regression, *arguments, **arguments)
 
     if os.path.exists('output.txt'):
-        fp = open('output.txt', "r")
-        out = fp.read()
-        fp.close()
+        with open('output.txt', "r") as fp:
+            out = fp.read()
         os.remove('output.txt')
 
     # print(out)

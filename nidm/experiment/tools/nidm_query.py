@@ -77,7 +77,6 @@ from json import dumps, loads
 @click.option("--blaze", "-bg", required=False,
               help="Base URL for Blazegraph. Ex: http://172.19.0.2:9999/blazegraph/sparql")
 @click.option('-v', '--verbosity', required=False, help="Verbosity level 0-5, 0 is default", default="0")
-
 def query(nidm_file_list, cde_file_list, query_file, output_file, get_participants, get_instruments, get_instrument_vars, get_dataelements, get_brainvols,get_dataelements_brainvols, get_fields, uri, blaze, j, verbosity):
     """
     This function provides query support for NIDM graphs.
@@ -91,7 +90,7 @@ def query(nidm_file_list, cde_file_list, query_file, output_file, get_participan
 
     if blaze:
         os.environ["BLAZEGRAPH_URL"] = blaze
-        print("setting BLAZEGRAPH_URL to {}".format(blaze))
+        print(f"setting BLAZEGRAPH_URL to {blaze}")
 
     if get_participants:
         df = GetParticipantIDs(nidm_file_list.split(','),output_file=output_file)
@@ -185,16 +184,15 @@ def query(nidm_file_list, cde_file_list, query_file, output_file, get_participan
         else:
             restParser.setOutputFormat(RestParser.CLI_FORMAT)
         df = restParser.run(nidm_file_list.split(','), uri)
-        if (output_file is not None):
-            if j:
-                with open(output_file,"w+") as f:
-                    f.write(dumps(df))
-            else:
-                # convert object df to dataframe and output
-                pd.DataFrame(df).to_csv(output_file)
-        else:
+        if output_file is None:
             print (df)
 
+        elif j:
+            with open(output_file,"w+") as f:
+                f.write(dumps(df))
+        else:
+            # convert object df to dataframe and output
+            pd.DataFrame(df).to_csv(output_file)
     elif get_dataelements_brainvols:
         brainvol = GetBrainVolumeDataElements(nidm_file_list=nidm_file_list)
          #if output file parameter specified

@@ -47,9 +47,6 @@ from nidm.experiment.tools.click_base import cli
 @cli.command()
 @click.option("--nidm_file_list", "-nl", required=True,
               help="A comma separated list of NIDM files with full path")
-
-
-
 def visualize(nidm_file_list):
     '''
     This command will produce a visualization(pdf) of the supplied NIDM files named the same as the input files and
@@ -64,7 +61,12 @@ def visualize(nidm_file_list):
         file_parts = os.path.split(nidm_file)
 
         # write graph as nidm filename + .pdf
-        project.save_DotGraph(filename=os.path.join(file_parts[0], os.path.splitext(file_parts[1])[0] + '.pdf'), format='pdf' )
+        project.save_DotGraph(
+            filename=os.path.join(
+                file_parts[0], f'{os.path.splitext(file_parts[1])[0]}.pdf'
+            ),
+            format='pdf',
+        )
 
 
 

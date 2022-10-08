@@ -255,10 +255,12 @@ def provone_to_dot(bundle, show_nary=True, use_labels=False,
     def _bundle_to_dot(dot, bundle):
         def _attach_attribute_annotation(node, record):
             # Adding a node to show all attributes
-            attributes = list(
-                (attr_name, value) for attr_name, value in record.attributes
+            attributes = [
+                (attr_name, value)
+                for attr_name, value in record.attributes
                 if attr_name not in PROV_ATTRIBUTE_QNAMES
-            )
+            ]
+
 
             if not attributes:
                 return  # No attribute to display
@@ -268,15 +270,24 @@ def provone_to_dot(bundle, show_nary=True, use_labels=False,
 
             ann_rows = [ANNOTATION_START_ROW]
             ann_rows.extend(
-                ANNOTATION_ROW_TEMPLATE % (
-                    attr.uri, escape(six.text_type(attr)),
-                    ' href=\"%s\"' % value.uri if isinstance(value, Identifier)
-                    else '',
-                    escape(six.text_type(value)
-                           if not isinstance(value, datetime) else
-                           six.text_type(value.isoformat())))
+                (
+                    ANNOTATION_ROW_TEMPLATE
+                    % (
+                        attr.uri,
+                        escape(six.text_type(attr)),
+                        ' href=\"%s\"' % value.uri
+                        if isinstance(value, Identifier)
+                        else '',
+                        escape(
+                            six.text_type(value.isoformat())
+                            if isinstance(value, datetime)
+                            else six.text_type(value)
+                        ),
+                    )
+                )
                 for attr, value in attributes
             )
+
             ann_rows.append(ANNOTATION_END_ROW)
             count[3] += 1
             annotations = pydot.Node(
@@ -301,10 +312,11 @@ def provone_to_dot(bundle, show_nary=True, use_labels=False,
                     bundle_label = ('<%s<br />'
                                     '<font color="#333333" point-size="10">'
                                     '%s</font>>')
-                    bundle_label = bundle_label % (
+                    bundle_label %= (
                         six.text_type(bundle.label),
-                        six.text_type(bundle.identifier)
+                        six.text_type(bundle.identifier),
                     )
+
                 subdot.set_label('"%s"' % six.text_type(bundle_label))
             else:
                 subdot.set_label('"%s"' % six.text_type(bundle.identifier))
@@ -325,8 +337,11 @@ def provone_to_dot(bundle, show_nary=True, use_labels=False,
                     node_label = ('<%s<br />'
                                   '<font color="#333333" point-size="10">'
                                   '%s</font>>')
-                    node_label = node_label % (six.text_type(record.label),
-                                               six.text_type(record.identifier))
+                    node_label %= (
+                        six.text_type(record.label),
+                        six.text_type(record.identifier),
+                    )
+
             else:
                 node_label = '"%s"' % six.text_type(record.identifier)
 

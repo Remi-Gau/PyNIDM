@@ -81,32 +81,38 @@ def main(argv):
             file_parts = os.path.split(nidm_file)
 
             # write graph as nidm filename + .pdf
-            project.save_DotGraph(filename=os.path.join(file_parts[0], os.path.splitext(file_parts[1])[0] + '.pdf'), format='pdf' )
+            project.save_DotGraph(
+                filename=os.path.join(
+                    file_parts[0], f'{os.path.splitext(file_parts[1])[0]}.pdf'
+                ),
+                format='pdf',
+            )
 
-        #create empty graph
-        #graph=Graph()
-        #for nidm_file in args.nidm_files:
-        #     tmp = Graph()
-        #     graph = graph + tmp.parse(nidm_file,format=util.guess_format(nidm_file))
+
+            #create empty graph
+            #graph=Graph()
+            #for nidm_file in args.nidm_files:
+            #     tmp = Graph()
+            #     graph = graph + tmp.parse(nidm_file,format=util.guess_format(nidm_file))
 
 
-        # project=read_nidm(StringIO.write(graph.serialize(format='turtle')))
-        # project.save_DotGraph(filename=args.output_file+'.pdf',format='pdf')
-        # WIP: Workaround because not all NIDM files only contain NIDM-E objects and so read_nidm function needs to be
-        # updated for project.save_DotGraph to work...so this is a clunky workaround using the command line tool
-        # rdf2dot
+            # project=read_nidm(StringIO.write(graph.serialize(format='turtle')))
+            # project.save_DotGraph(filename=args.output_file+'.pdf',format='pdf')
+            # WIP: Workaround because not all NIDM files only contain NIDM-E objects and so read_nidm function needs to be
+            # updated for project.save_DotGraph to work...so this is a clunky workaround using the command line tool
+            # rdf2dot
 
-        # result is the standard output dot graph stream
-        # write temporary file to disk and use for stats
-        #temp = tempfile.NamedTemporaryFile(delete=False)
-        #temp.write(graph.serialize(format='turtle'))
-        #temp.close()
-        #uber_nidm_file = temp.name
-        #result = subprocess.run(['rdf2dot',uber_nidm_file], stdout=subprocess.PIPE)
+            # result is the standard output dot graph stream
+            # write temporary file to disk and use for stats
+            #temp = tempfile.NamedTemporaryFile(delete=False)
+            #temp.write(graph.serialize(format='turtle'))
+            #temp.close()
+            #uber_nidm_file = temp.name
+            #result = subprocess.run(['rdf2dot',uber_nidm_file], stdout=subprocess.PIPE)
 
-        # now use graphviz Source to create dot graph object
-        #src=Source(result)
-        #src.render(args.output_file+'.pdf',view=False,format='pdf')
+            # now use graphviz Source to create dot graph object
+            #src=Source(result)
+            #src.render(args.output_file+'.pdf',view=False,format='pdf')
 
 
 
@@ -115,7 +121,7 @@ def main(argv):
         for nidm_file in args.nidm_files:
             project=read_nidm(nidm_file)
             #serialize to jsonld
-            with open(splitext(nidm_file)[0]+".json",'w') as f:
+            with open(f"{splitext(nidm_file)[0]}.json", 'w') as f:
                 f.write(project.serializeJSONLD())
 
 

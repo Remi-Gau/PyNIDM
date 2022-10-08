@@ -14,7 +14,7 @@ def download_cde_files():
     cde_dir = tempfile.gettempdir()
 
     for url in Constants.CDE_FILE_LOCATIONS:
-        urlretrieve( url, "{}/{}".format(cde_dir, url.split('/')[-1] ) )
+        urlretrieve(url, f"{cde_dir}/{url.split('/')[-1]}")
 
     return cde_dir
 
@@ -28,7 +28,7 @@ def getCDEs(file_list=None):
     hasher.update(str(file_list).encode('utf-8'))
     h = hasher.hexdigest()
 
-    cache_file_name = tempfile.gettempdir() + "/cde_graph.{}.pickle".format(h)
+    cache_file_name = f"{tempfile.gettempdir()}/cde_graph.{h}.pickle"
 
     if path.isfile(cache_file_name):
         rdf_graph = pickle.load(open(cache_file_name, "rb"))
@@ -39,10 +39,7 @@ def getCDEs(file_list=None):
 
     if not file_list:
 
-        cde_dir = ''
-        if "CDE_DIR" in environ:
-            cde_dir = environ['CDE_DIR']
-
+        cde_dir = environ['CDE_DIR'] if "CDE_DIR" in environ else ''
         if (not cde_dir) and (path.isfile( '/opt/project/nidm/core/cde_dir/ants_cde.ttl' )):
             cde_dir = '/opt/project/nidm/core/cde_dir'
 
@@ -51,7 +48,7 @@ def getCDEs(file_list=None):
 
         file_list = [ ]
         for f in ['ants_cde.ttl', 'fs_cde.ttl', 'fsl_cde.ttl']:
-            fname = '{}/{}'.format(cde_dir, f)
+            fname = f'{cde_dir}/{f}'
             if path.isfile( fname ):
                 file_list.append( fname )
 
@@ -65,10 +62,8 @@ def getCDEs(file_list=None):
 
 
 
-    cache_file = open(cache_file_name , 'wb')
-    pickle.dump(rdf_graph, cache_file)
-    cache_file.close()
-
+    with open(cache_file_name , 'wb') as cache_file:
+        pickle.dump(rdf_graph, cache_file)
     getCDEs.cache = rdf_graph
     return rdf_graph
 getCDEs.cache = None

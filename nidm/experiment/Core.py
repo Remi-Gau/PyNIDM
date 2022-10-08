@@ -59,22 +59,22 @@ class Core(object):
 
     #class constructor with user-supplied PROV document/graph, namespaces from Constants.py
     @classmethod
-    def withGraph(self,graph):
+    def withGraph(cls, graph):
         """
         Alternate constructor, loads user-supplied graph and default namespaces from NIDM/Scripts/Constants.py
 
         Keyword arguments:
             graph -- an rdflib.Graph object
         """
-        self.graph = graph
-        self.namespaces = {}
+        cls.graph = graph
+        cls.namespaces = {}
         #bind namespaces to self.graph
-        for name, namespace in self.namespaces.items():
-            self.graph.add_namespace(name, namespace)
+        for name, namespace in cls.namespaces.items():
+            cls.graph.add_namespace(name, namespace)
 
     #class constructor with user-supplied graph and namespaces
     @classmethod
-    def withGraphAndNamespaces(self,graph,namespaces):
+    def withGraphAndNamespaces(cls, graph, namespaces):
         """
         Alternate constructor, loads user-supplied graph and binds user-supplied namespaces
 
@@ -84,11 +84,11 @@ class Core(object):
         """
 
 
-        self.graph = graph
-        self.namespaces = namespaces
+        cls.graph = graph
+        cls.namespaces = namespaces
         #bind namespaces to self.graph
-        for name, namespace in self.namespaces.items():
-            self.graph.add_namespace(name, namespace)
+        for name, namespace in cls.namespaces.items():
+            cls.graph.add_namespace(name, namespace)
 
     def get_uuid(self):
         '''
@@ -125,11 +125,7 @@ class Core(object):
         :return: True if prefix exists, False if not
         """
         #check if prefix already exists
-        if prefix in self.graph._namespaces.keys():
-            #prefix already exists
-            return True
-        else:
-            return False
+        return prefix in self.graph._namespaces.keys()
 
     def safe_string(self, string):
         return string.strip().replace(" ","_").replace("-", "_").replace(",", "_").replace("(", "_").replace(")","_")\
@@ -186,21 +182,12 @@ class Core(object):
         :return: association
         """
 
-        #connect self to person serving as role
-        #WIP this doesn't work for subclasses as they don't have the pm.ProvActivity type
-        #Might be able to use the following and look into the tuples but for now skip this check
-        #import inspect
-        #class_tree = inspect.getclasstree([self.__class__])
-
-        #if(isinstance(self, pm.ProvActivity)):
-
-        #associate person with activity for qualified association
-        assoc = self.graph.association(agent=person, activity=self, other_attributes={pm.PROV_ROLE:role})
-
         #add wasAssociatedWith association
         #self.wasAssociatedWith(person)
 
-        return assoc
+        return self.graph.association(
+            agent=person, activity=self, other_attributes={pm.PROV_ROLE: role}
+        )
 
     def addLiteralAttribute(self, namespace_prefix, term, object, namespace_uri=None):
         """
@@ -218,7 +205,7 @@ class Core(object):
             #if so, use URI
             #namespace_uri = self.namespaces[namespace_prefix]
         #else: #add namespace_uri + prefix to graph
-            if (namespace_uri == None):
+            if namespace_uri is None:
                 raise TypeError("Namespace_uri argument must be defined for new namespaces")
             else:
                 self.addNamespace(namespace_prefix,namespace_uri)
@@ -226,9 +213,16 @@ class Core(object):
         #figure out if predicate namespace is defined, if not, return predicate namespace error
         try:
             if (datatype != None):
-                self.add_attributes({str(namespace_prefix + ':' + term): pm.Literal(object, datatype=datatype)})
+                self.add_attributes(
+                    {
+                        str(f'{namespace_prefix}:{term}'): pm.Literal(
+                            object, datatype=datatype
+                        )
+                    }
+                )
+
             else:
-                self.add_attributes({str(namespace_prefix + ':' + term): pm.Literal(object)})
+                self.add_attributes({str(f'{namespace_prefix}:{term}'): pm.Literal(object)})
         except KeyError as e:
             print("\nPredicate namespace identifier \" %s \" not found! \n" % (str(e).split("'")[1]))
             print("Use addNamespace method to add namespace before adding literal attribute \n")
@@ -276,18 +270,12 @@ class Core(object):
             #if not validators.url(key):
                 #check if namespace prefix already exists in graph or #if we're using a Constants reference
             if (not self.checkNamespacePrefix(key.split(':')[0])):
-                raise TypeError("Namespace prefix " + key + " not in graph, use addAttributesWithNamespaces or manually add!")
+                raise TypeError(
+                    f"Namespace prefix {key} not in graph, use addAttributesWithNamespaces or manually add!"
+                )
+
             #figure out datatype of literal
             datatype = self.getDataType(attributes[key])
-            #if (not validators.url(key)):
-                #we must be using the prefix:term form instead of a constant directly
-
-            #    if (datatype != None):
-            #        id.add_attributes({self.namespaces[key.split(':')[0]][key.split(':')[1]]:Literal(attributes[key],datatype=datatype)})
-            #    else:
-            #        id.add_attributes({self.namespaces[key.split(':')[0]][key.split(':')[1]]:Literal(attributes[key])})
-            #else:
-                #we're using the Constants form
             if (datatype != None):
                 id.add_attributes({key:pm.Literal(attributes[key],datatype=datatype)})
             else:
@@ -316,7 +304,7 @@ class Core(object):
             uri=s
 
         if uri is None:
-            print("Error finding %s in NIDM-Exp Graph" %NIDM_TYPE)
+            print(f"Error finding {NIDM_TYPE} in NIDM-Exp Graph")
             return metadata
 
         #Cycle through metadata and add to json
@@ -339,13 +327,8 @@ class Core(object):
         :param identifier: Optional identifier to use for graph serialization
         :return: text of serialized graph in Turtle format
         """
-        if identifier is not None:
-            rdf_graph = Graph(identifier=identifier)
-            rdf_graph.parse(source=StringIO(self.serializeTurtle()),format='turtle')
-        else:
-            rdf_graph = Graph()
-            rdf_graph.parse(source=StringIO(self.serializeTurtle()),format='turtle')
-
+        rdf_graph = Graph(identifier=identifier) if identifier is not None else Graph()
+        rdf_graph.parse(source=StringIO(self.serializeTurtle()),format='turtle')
         #return rdf_graph.serialize(format='trig').decode('ASCII')
         return rdf_graph.serialize(format='trig')
 
@@ -392,16 +375,14 @@ class Core(object):
         #load current OWL files
         term_graph=load_nidm_owl_files()
 
-        context={}
+        context = {'@version': 1.1, 'records': {}}
 
 
-        context['@version'] = 1.1
-        context['records'] = {}
         context['records']['@container'] = "@type"
         context['records']['@id'] = "@graph"
 
         #load Constants.namespaces
-        context.update(Constants.namespaces)
+        context |= Constants.namespaces
 
         context.update ({
             "xsd": {"@type": "@id","@id":"http://www.w3.org/2001/XMLSchema#"},
@@ -488,18 +469,20 @@ class Core(object):
         '''
         qres = rdf_graph.query(query)
         for row in qres:
-            print("project uuid = %s" %row)
+            print(f"project uuid = {row}")
             # parse uuid from project URI
             #project_uuid = str(row[0]).rsplit('/', 1)[-1]
             project_uuid = str(row[0])
-            # for each Project uuid search dot structure for Project uuid
-            project_node = None
-            for key,value in dot.obj_dict['nodes'].items():
-                # get node number in DOT graph for Project
-                if 'URL' in dot.obj_dict['nodes'][key][0]['attributes']:
-                    if project_uuid in str(dot.obj_dict['nodes'][key][0]['attributes']['URL']):
-                        project_node = key
-                        break
+            project_node = next(
+                (
+                    key
+                    for key, value in dot.obj_dict['nodes'].items()
+                    if 'URL' in dot.obj_dict['nodes'][key][0]['attributes']
+                    and project_uuid
+                    in str(dot.obj_dict['nodes'][key][0]['attributes']['URL'])
+                ),
+                None,
+            )
 
         # for each Session in Project class self.sessions list, find node numbers in DOT graph
 
@@ -507,32 +490,38 @@ class Core(object):
             print(session)
             for key,value in dot.obj_dict['nodes'].items():
                 # get node number in DOT graph for Project
-                if 'URL' in dot.obj_dict['nodes'][key][0]['attributes']:
-                    if session.identifier.uri in str(dot.obj_dict['nodes'][key][0]['attributes']['URL']):
-                        session_node= key
-                        #print("session node = %s" %key)
+                if 'URL' in dot.obj_dict['nodes'][key][0][
+                    'attributes'
+                ] and session.identifier.uri in str(
+                    dot.obj_dict['nodes'][key][0]['attributes']['URL']
+                ):
+                    session_node= key
+                    #print("session node = %s" %key)
 
-                        # add to DOT structure edge between project_node and session_node
-                        dot.add_edge(Edge(session_node, project_node, **style))
+                    # add to DOT structure edge between project_node and session_node
+                    dot.add_edge(Edge(session_node, project_node, **style))
 
 
 
 
                         # for each Acquisition in Session class ._acquisitions list, find node numbers in DOT graph
-                        for acquisition in session.get_acquisitions():
+                    for acquisition in session.get_acquisitions():
                             # search through the nodes again to figure out node number for acquisition
-                            for key,value in dot.obj_dict['nodes'].items():
+                        for key, value in dot.obj_dict['nodes'].items():
                                 # get node number in DOT graph for Project
-                                if 'URL' in dot.obj_dict['nodes'][key][0]['attributes']:
-                                    if acquisition.identifier.uri in str(dot.obj_dict['nodes'][key][0]['attributes']['URL']):
-                                        acquisition_node = key
-                                        #print("acquisition node = %s" %key)
+                            if 'URL' in dot.obj_dict['nodes'][key][0][
+                                'attributes'
+                            ] and acquisition.identifier.uri in str(
+                                dot.obj_dict['nodes'][key][0]['attributes']['URL']
+                            ):
+                                acquisition_node = key
+                                #print("acquisition node = %s" %key)
 
-                                        dot.add_edge(Edge(acquisition_node, session_node, **style))
+                                dot.add_edge(Edge(acquisition_node, session_node, **style))
 
 
         #add some logic to find nodes with dct:hasPart relation and add those edges to graph...prov_to_dot ignores these
-        if not (format == "None"):
+        if format != "None":
             dot.write(filename,format=format)
         else:
             dot.write(filename,format="pdf")

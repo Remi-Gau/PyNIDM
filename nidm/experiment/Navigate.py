@@ -25,7 +25,7 @@ def makeValueTypeFromDataTypeInfo(value, data_type_info_tuple):
         data_type_info_tuple = {}
 
     for key in ['label', 'datumType', 'hasUnit', 'isAbout', 'measureOf', 'hasLaterality', 'dataElement', 'description', 'subject', 'project', 'source_variable']:
-        if not key in data_type_info_tuple:
+        if key not in data_type_info_tuple:
             data_type_info_tuple[key] = None
 
 
@@ -45,10 +45,7 @@ def expandID(id, namespace):
     if id.find('http') < 0:
         return namespace[id]
     # it has a http, but isn't a URIRef so convert it
-    if type(id) == str:
-        return URIRef(id)
-
-    return id
+    return URIRef(id) if type(id) == str else id
 
 
 @functools.lru_cache(maxsize=BIG_CACHE_SIZE)
@@ -66,18 +63,15 @@ def simplifyURIWithPrefix(nidm_file_tuples, uri):
         for f in nidm_file_tuples:
             rdf_graph = OpenGraph(f)
             for (prefix, uri) in rdf_graph.namespace_manager.namespaces():
-                if not str(uri) in names:
+                if str(uri) not in names:
                     names[str(uri)] = prefix
         return names
 
     names = getNamespaceLookup(tuple(nidm_file_tuples))
     # strip off the bit of URI after the last /
-    trimed_uri = str(uri).split('/')[0:-1]
+    trimed_uri = str(uri).split('/')[:-1]
     trimed_uri = '/'.join(trimed_uri) + '/'
-    if trimed_uri in names:
-        return names[trimed_uri]
-    else:
-        return uri
+    return names[trimed_uri] if trimed_uri in names else uri
 
 @functools.lru_cache(maxsize=QUERY_CACHE_SIZE)
 def getProjects(nidm_file_tuples):
@@ -86,8 +80,12 @@ def getProjects(nidm_file_tuples):
     for file in nidm_file_tuples:
         rdf_graph = OpenGraph(file)
         #find all the sessions
-        for (project, p, o) in rdf_graph.triples((None, isa, Constants.NIDM['Project'])):
-            projects.append(project)
+        projects.extend(
+            project
+            for project, p, o in rdf_graph.triples(
+                (None, isa, Constants.NIDM['Project'])
+            )
+        )
 
     return projects
 
@@ -99,10 +97,13 @@ def getSessions(nidm_file_tuples, project_id):
     for file in nidm_file_tuples:
         rdf_graph = OpenGraph(file)
         #find all the sessions
-        for (session, p, o) in rdf_graph.triples((None, isa, Constants.NIDM['Session'])):
-            #check if it is part of our project
-            if (session, isPartOf, project_uri) in rdf_graph:
-                sessions.append(session)
+        sessions.extend(
+            session
+            for session, p, o in rdf_graph.triples(
+                (None, isa, Constants.NIDM['Session'])
+            )
+            if (session, isPartOf, project_uri) in rdf_graph
+        )
 
     return sessions
 
@@ -114,10 +115,11 @@ def getAcquisitions(nidm_file_tuples, session_id):
     for file in nidm_file_tuples:
         rdf_graph = OpenGraph(file)
         #find all the sessions
-        for (acq, p, o) in rdf_graph.triples((None, isPartOf, session_uri)):
-            #check if it is a acquisition
-            if (acq, isa, Constants.NIDM['Acquisition']) in rdf_graph:
-                acquisitions.append(acq)
+        acquisitions.extend(
+            acq
+            for acq, p, o in rdf_graph.triples((None, isPartOf, session_uri))
+            if (acq, isa, Constants.NIDM['Acquisition']) in rdf_graph
+        )
 
     return acquisitions
 
@@ -155,10 +157,7 @@ def getSubjectUUIDsfromID(nidm_file_tuples, sub_id):
         rdf_graph = OpenGraph(file)
 
         result = rdf_graph.triples((None, Constants.NDAR['src_subject_id'], None))
-        for (s,p,o) in result:
-            if str(o) == str(sub_id):
-                uuids.append( URITail(s) )
-
+        uuids.extend(URITail(s) for s, p, o in result if str(o) == str(sub_id))
     return uuids
 
 @functools.lru_cache(maxsize=QUERY_CACHE_SIZE)
@@ -236,21 +235,17 @@ def getActivityData(nidm_file_tuples, acquisition_id):
                 # iterate over all the items in the acquisition object
                 for (s, p, o) in rdf_graph.triples((data_object, None, None)):
 
-                    dti = getDataTypeInfo(rdf_graph, p)
-                    if (dti):
+                    if dti := getDataTypeInfo(rdf_graph, p):
                         # there is a DataElement describing this predicate
                         value_type = makeValueTypeFromDataTypeInfo(value=trimWellKnownURIPrefix(o), data_type_info_tuple=dti)
                         result.append( value_type )
+                    elif (data_object, isa, Constants.ONLI['assessment-instrument']) in rdf_graph:
+                        result.append(makeValueType(value=trimWellKnownURIPrefix(o), label=simplifyURIWithPrefix(nidm_file_tuples, str(p))))
+                        #result[ simplifyURIWithPrefix(nidm_file_list, str(p)) ] = trimWellKnownURIPrefix(o)
                     else:
-                        #Don't know exactly what this is so just set a label and be done.
-                        if (data_object, isa, Constants.ONLI['assessment-instrument']) in rdf_graph:
-                            result.append(makeValueType(value=trimWellKnownURIPrefix(o), label=simplifyURIWithPrefix(nidm_file_tuples, str(p))))
-                            #result[ simplifyURIWithPrefix(nidm_file_list, str(p)) ] = trimWellKnownURIPrefix(o)
-                        else:
-                            result.append(makeValueType(value=trimWellKnownURIPrefix(o), label=URITail(str(p))))
-                            # result[ URITail(str(p))] = trimWellKnownURIPrefix(o)
+                        result.append(makeValueType(value=trimWellKnownURIPrefix(o), label=URITail(str(p))))
+                        # result[ URITail(str(p))] = trimWellKnownURIPrefix(o)
 
-            # or maybe it's a stats collection
             elif isAStatCollection (nidm_file_tuples, data_object):
                 category = 'derivative'
                 for (s, p, o) in rdf_graph.triples((data_object, None, None)):
@@ -374,7 +369,11 @@ def GetDataelementDetails(nidm_files_tuple, dataelement):
             dti = getDataTypeInfo(rdf_graph, de_uri)
 
             # check if this is the correct one
-            if not (dataelement in [ str(dti['label']), str(dti['dataElement']), str(dti['dataElementURI']) ] ):
+            if dataelement not in [
+                str(dti['label']),
+                str(dti['dataElement']),
+                str(dti['dataElementURI']),
+            ]:
                 continue
 
             for key in dti.keys():
@@ -393,25 +392,27 @@ def GetDataelementDetails(nidm_files_tuple, dataelement):
                         d_list = rdf_graph.objects(subject=c, predicate=Constants.DCT['isPartOf'])
                         for d in d_list: # d is most likely a project
                             if d in rdf_graph.subjects(predicate=isa, object=Constants.NIDM['Project']):
-                                result['inProjects'].add("{} ({})".format(str(d), file))
+                                result['inProjects'].add(f"{str(d)} ({file})")
 
             return result # found it, we are done
 
 
-    if result == {}:  # didn't find it yet, check the CDEs
+    if not result:  # didn't find it yet, check the CDEs
         cde_graph = nidm.experiment.CDE.getCDEs()
         for de_uri in cde_graph.subjects(predicate=isa):
             dti = getDataTypeInfo(cde_graph, de_uri)
 
             # check if this is the correct one
-            if not (dataelement in [str(dti['label']), str(dti['dataElement']), str(dti['dataElementURI'])]):
+            if dataelement not in [
+                str(dti['label']),
+                str(dti['dataElement']),
+                str(dti['dataElementURI']),
+            ]:
                 continue
 
             for key in dti.keys():
                 result[key] = dti[key]
-            result['inProjects'] = set()
-            result['inProjects'].add("Common Data Element")
-
+            result['inProjects'] = {"Common Data Element"}
             for file in nidm_files_tuple:
                 rdf_graph = OpenGraph(file)
                 if result['dataElementURI'] in rdf_graph.predicates():
