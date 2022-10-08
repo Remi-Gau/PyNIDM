@@ -23,6 +23,9 @@ import pandas as pd
 from uuid import UUID
 from urllib.request import urlopen
 
+from rich import print
+from rich.prompt import Prompt, IntPrompt
+
 #NIDM imports
 from ..core import Constants
 from ..core.Constants import DD
@@ -43,6 +46,7 @@ from .DataElement import DataElement
 from .MRObject import MRObject
 from .PETObject import PETObject
 from .Core import Core
+from .TUI import term_datatype_prompt, separator, select_integer_from_option, format_prompt_msg, print_item
 import logging
 logger = logging.getLogger(__name__)
 
@@ -111,7 +115,8 @@ def read_nidm(nidmDoc):
     if proj_id is None:
         print("Error reading NIDM-Exp Document %s, Must have Project Object" % nidmDoc)
         print()
-        create_obj = input("Should read_nidm create a Project object for you [yes]: ")
+        msg = "Should read_nidm create a Project object for you"
+        create_obj = Prompt.ask(format_prompt_msg(msg), default="yes")
         if (create_obj == 'yes' or create_obj == ''):
             project = Project(empty_graph=True,add_default_type=True)
             # add namespaces to prov graph
@@ -899,7 +904,8 @@ def authenticate_github(authed=None,credentials=None):
             pw = getpass.getpass("Please enter your GitHub password: ")
             g=Github(credentials[0],pw)
         else:
-            username = input("Please enter your GitHub user name: ")
+            msg = "Please enter your GitHub user name"
+            username = Prompt.ask(format_prompt_msg(msg))
             pw = getpass.getpass("Please enter your GitHub password: ")
             #try to logging into GitHub
             g=Github(username,pw)
@@ -943,6 +949,7 @@ def getSubjIDColumn(column_to_terms,df):
         for column in df.columns:
             print("%d: %s" %(option,column))
             option=option+1
+            
         selection=input("Please select the subject ID field from the list above: ")
         id_field=df.columns[int(selection)-1]
     return id_field
@@ -1144,7 +1151,7 @@ def map_variables_to_terms(df,directory, assessment_name, output_file=None,json_
                         column_to_terms[current_tuple]['description'] = ""
                     # column_to_terms[current_tuple]['variable'] = json_map[json_key[0]]['variable']
 
-                    print("\n*************************************************************************************")
+                    separator()
                     print("Column %s already annotated in user supplied JSON mapping file" %column)
                     print("label: %s" %column_to_terms[current_tuple]['label'])
                     print("description: %s" %column_to_terms[current_tuple]['description'])
@@ -1364,8 +1371,8 @@ def map_variables_to_terms(df,directory, assessment_name, output_file=None,json_
                             # write annotations to json file so user can start up again if not doing whole file
                             write_json_mapping_file(column_to_terms,output_file,bids)
 
-            print("***************************************************************************************")
-            print("---------------------------------------------------------------------------------------")
+            separator()
+            separator()
 
             if (json_map is not None) and (len(json_key)>0):
                 continue
@@ -1402,7 +1409,7 @@ def map_variables_to_terms(df,directory, assessment_name, output_file=None,json_
             print("Description: %s" %column_to_terms[subjid_tuple]['description'])
             #print("Url: %s" %column_to_terms[subjid_tuple]['url'])
             print("Source Variable: %s" % column_to_terms[subjid_tuple]['source_variable'])
-            print("---------------------------------------------------------------------------------------")
+            separator()
             continue
         # if we haven't already found an annotation for this column then have user create one.
         if current_tuple not in column_to_terms.keys():
@@ -1555,9 +1562,10 @@ def find_concept_interactive(source_variable, current_tuple, source_variable_ann
                         print("NIDM-Terms Concepts:")
                         first_nidm_term = False
 
-                    print("%d: Label: %s \t Definition: %s \t URL: %s" % (
-                    option, nidmterms_concepts_query[key]['label'], nidmterms_concepts_query[key]['definition'],
-                    nidmterms_concepts_query[key]['url']))
+                    print_item(item_nb=option, 
+                                label=nidmterms_concepts_query[key]['label'], 
+                                definition=nidmterms_concepts_query[key]['definition'], 
+                                url=nidmterms_concepts_query[key]['url'])
                     search_result[key] = {}
                     search_result[key]['label'] = nidmterms_concepts_query[key]['label']
                     search_result[key]['definition'] = nidmterms_concepts_query[key]['definition']
@@ -1578,9 +1586,11 @@ def find_concept_interactive(source_variable, current_tuple, source_variable_ann
                     print()
                     # print("Search Results: ")
                     for key, value in ilx_result.items():
-                        print("%d: Label: %s \t Definition: %s \t Preferred URL: %s " % (
-                        option, ilx_result[key]['label'], ilx_result[key]['definition'],
-                        ilx_result[key]['preferred_url']))
+
+                        print_item(item_nb = option, 
+                                    label=ilx_result[key]['label'], 
+                                    definition=ilx_result[key]['definition'], 
+                                    url=ilx_result[key]['preferred_url'])
 
                         search_result[key]={}
                         search_result[key]['label'] = ilx_result[key]['label']
@@ -1602,8 +1612,11 @@ def find_concept_interactive(source_variable, current_tuple, source_variable_ann
                             print()
                             first_cogatlas_concept = False
 
-                        print("%d: Label: %s \t Definition:   %s " % (
-                            option, cogatlas_concepts_query[key]['label'], cogatlas_concepts_query[key]['definition'].rstrip('\r\n')))
+                        print_item(item_nb = option, 
+                                    label=cogatlas_concepts_query[key]['label'], 
+                                    definition=cogatlas_concepts_query[key]['definition'].rstrip('\r\n'), 
+                                    url=cogatlas_concepts_query[key]['url'])                            
+
                         search_result[key] = {}
                         search_result[key]['label'] = cogatlas_concepts_query[key]['label']
                         search_result[key]['definition'] = cogatlas_concepts_query[key]['definition'].rstrip('\r\n')
@@ -1618,9 +1631,12 @@ def find_concept_interactive(source_variable, current_tuple, source_variable_ann
                 cogatlas_disorders_query = fuzzy_match_terms_from_cogatlas_json(cogatlas_disorders.json, search_term)
                 for key, subdict in cogatlas_disorders_query.items():
                     if cogatlas_disorders_query[key]['score'] > min_match_score+20:
-                        print("%d: Label: %s \t Definition:   %s " % (
-                            option, cogatlas_disorders_query[key]['label'], cogatlas_disorders_query[key]['definition'].rstrip('\r\n'),
-                            ))
+
+                        print_item(item_nb = option, 
+                                    label=cogatlas_disorders_query[key]['label'], 
+                                    definition=cogatlas_disorders_query[key]['definition'].rstrip('\r\n'), 
+                                    url=cogatlas_disorders_query[key]['url'])  
+
                         search_result[key] = {}
                         search_result[key]['label'] = cogatlas_disorders_query[key]['label']
                         search_result[key]['definition'] = cogatlas_disorders_query[key]['definition'].rstrip('\r\n')
@@ -1645,9 +1661,11 @@ def find_concept_interactive(source_variable, current_tuple, source_variable_ann
                             print("NIDM Ontology Terms:")
                             first_nidm_term = False
 
-                        print("%d: Label: %s \t Definition: %s \t URL: %s" % (
-                                option, nidm_constants_query[key]['label'], nidm_constants_query[key]['definition'],
-                                nidm_constants_query[key]['url']))
+                        print_item(item_nb = option, 
+                                    label=nidm_constants_query[key]['label'], 
+                                    definition=nidm_constants_query[key]['definition'], 
+                                    url=nidm_constants_query[key]['url'])                              
+
                         search_result[key] = {}
                         search_result[key]['label'] = nidm_constants_query[key]['label']
                         search_result[key]['definition'] = nidm_constants_query[key]['definition']
@@ -1676,14 +1694,10 @@ def find_concept_interactive(source_variable, current_tuple, source_variable_ann
         option = option + 1
         print("%d: No concept needed for this variable" % option)
 
-        print("---------------------------------------------------------------------------------------")
+        separator()
         # Wait for user input
-        selection = input("Please select an option (1:%d) from above: \t" % option)
-
-        # Make sure user selected one of the options.  If not present user with selection input again
-        while (not selection.isdigit()) or (int(selection) > int(option)):
-            # Wait for user input
-            selection = input("Please select an option (1:%d) from above: \t" % option)
+        selection = select_integer_from_option(option)
+        selection = str(selection)
 
         # toggle use of ancestors in interlex query or not
         if int(selection) == (option - 2):
@@ -1691,8 +1705,9 @@ def find_concept_interactive(source_variable, current_tuple, source_variable_ann
         # check if selection is to re-run query with new search term
         elif int(selection) == (option - 1):
             # ask user for new search string
-            search_term = input("Please input new search string for CSV column: %s \t:" % source_variable)
-            print("---------------------------------------------------------------------------------------")
+            msg = f"Please input new search string for CSV column: {source_variable}"
+            search_term = Prompt.ask(format_prompt_msg(msg))            
+            separator()
 
         ########DEFINE NEW CONCEPT COMMENTED OUT RIGHT NOW####################################
         #elif int(selection) == (option - 1):
@@ -1726,8 +1741,10 @@ def define_new_concept(source_variable, ilx_obj):
     print("\nYou selected to enter a new concept for CSV column: %s" % source_variable)
 
     # collect term information from user
-    concept_label = input("Please enter a label for the new concept [%s]:\t" % source_variable)
-    concept_definition = input("Please enter a definition for this concept:\t")
+    msg = f"Please enter a label for the new concept: {source_variable}"
+    concept_label = Prompt.ask(format_prompt_msg(msg))      
+    msg = f"Please enter a definition for this concept"
+    concept_definition = Prompt.ask(format_prompt_msg(msg))     
 
     # add concept to InterLex and get URL
     # Add personal data element to InterLex
@@ -1748,76 +1765,59 @@ def annotate_data_element(source_variable, current_tuple, source_variable_annota
     print("\nYou will now be asked a series of questions to annotate your term: %s" % source_variable)
 
     # collect term information from user
-    term_label = input("Please enter a full name to associate with the term [%s]:\t" % source_variable)
+    msg = f"Please enter a full name to associate with the term: {source_variable}"
+    term_label = Prompt.ask(format_prompt_msg(msg))       
     if term_label == '':
         term_label = source_variable
 
-    term_definition = input("Please enter a definition for this term:\t")
+    msg = f"Please enter a definition for this term"
+    term_definition = Prompt.ask(format_prompt_msg(msg)) 
 
     # get datatype
-    while True:
-        print("Please enter the value type for this term from the following list:")
-        print("\t 1: string - The string datatype represents character strings")
-        print("\t 2: categorical - A variable that can take on one of a limited number of possible values, assigning each to a nominal category on the basis of some qualitative property.")
-        print("\t 3: boolean - Binary-valued logic:{true,false}")
-        print("\t 4: integer - Integer is a number that can be written without a fractional component")
-        print("\t 5: float - Float consists of the values m × 2^e, where m is an integer whose absolute value is less than 2^24, and e is an integer between -149 and 104, inclusive")
-        print("\t 6: double - Double consists of the values m × 2^e, where m is an integer whose absolute value is less than 2^53, and e is an integer between -1075 and 970, inclusive")
-        print("\t 7: duration - Duration represents a duration of time")
-        print("\t 8: dateTime - Values with integer-valued year, month, day, hour and minute properties, a decimal-valued second property, and a boolean timezoned property.")
-        print("\t 9: time - Time represents an instant of time that recurs every day")
-        print("\t 10: date - Date consists of top-open intervals of exactly one day in length on the timelines of dateTime, beginning on the beginning moment of each day (in each timezone)")
-        print("\t 11: anyURI - anyURI represents a Uniform Resource Identifier Reference (URI). An anyURI value can be absolute or relative, and may have an optional fragment identifier")
-        term_datatype = input("Please enter the datatype [1:11]:\t")
-        # check datatypes if not in [integer,real,categorical] repeat until it is
-        if int(term_datatype) >= 1 and int(term_datatype) <= 11:
-            if(int(term_datatype) == 1):
-                term_datatype = URIRef(Constants.XSD["string"])
-            elif (int(term_datatype) == 3):
-                term_datatype = URIRef(Constants.XSD["boolean"])
-            elif (int(term_datatype) == 4):
-                term_datatype = URIRef(Constants.XSD["integer"])
-            elif (int(term_datatype) == 5):
-                term_datatype = URIRef(Constants.XSD["float"])
-            elif (int(term_datatype) == 6):
-                term_datatype = URIRef(Constants.XSD["double"])
-            elif (int(term_datatype) == 7):
-                term_datatype = URIRef(Constants.XSD["duration"])
-            elif (int(term_datatype) == 8):
-                term_datatype = URIRef(Constants.XSD["dateTime"])
-            elif (int(term_datatype) == 9):
-                term_datatype = URIRef(Constants.XSD["time"])
-            elif (int(term_datatype) == 10):
-                term_datatype = URIRef(Constants.XSD["date"])
-            elif (int(term_datatype) == 11):
-                term_datatype = URIRef(Constants.XSD["anyURI"])
-            elif (int(term_datatype) == 2):
-                term_datatype = URIRef(Constants.XSD["complexType"])
-            break
+    term_datatype = term_datatype_prompt()
+    if(int(term_datatype) == 1):
+        term_datatype = URIRef(Constants.XSD["string"])
+    elif (int(term_datatype) == 3):
+        term_datatype = URIRef(Constants.XSD["boolean"])
+    elif (int(term_datatype) == 4):
+        term_datatype = URIRef(Constants.XSD["integer"])
+    elif (int(term_datatype) == 5):
+        term_datatype = URIRef(Constants.XSD["float"])
+    elif (int(term_datatype) == 6):
+        term_datatype = URIRef(Constants.XSD["double"])
+    elif (int(term_datatype) == 7):
+        term_datatype = URIRef(Constants.XSD["duration"])
+    elif (int(term_datatype) == 8):
+        term_datatype = URIRef(Constants.XSD["dateTime"])
+    elif (int(term_datatype) == 9):
+        term_datatype = URIRef(Constants.XSD["time"])
+    elif (int(term_datatype) == 10):
+        term_datatype = URIRef(Constants.XSD["date"])
+    elif (int(term_datatype) == 11):
+        term_datatype = URIRef(Constants.XSD["anyURI"])
+    elif (int(term_datatype) == 2):
+        term_datatype = URIRef(Constants.XSD["complexType"])
 
     # now check if term_datatype is categorical and if so let's get the label <-> value mappings
     if term_datatype == URIRef(Constants.XSD["complexType"]):
 
         # ask user for the number of categories
-        while True:
-            num_categories = input("Please enter the number of categories/labels for this term:\t")
-            # check if user supplied a number else repeat question
-            try:
-                val = int(num_categories)
-                break
-            except ValueError:
-                print("That's not an integer, please try again!")
+        msg = f"Please enter the number of categories/labels for this term"
+        num_categories = IntPrompt.ask(format_prompt_msg(msg))  
 
         # loop over number of categories and collect information
-        cat_value = input("Are there numerical values associated with your text-based categories [yes]?\t")
+        msg = f"Are there numerical values associated with your text-based categories?"
+        cat_value = Prompt.ask(format_prompt_msg(msg), choices =["yes", "no"], default="yes") 
         if (cat_value in ['Y', 'y', 'YES', 'yes', 'Yes']) or (cat_value == ""):
             # if yes then store this as a dictionary cat_label: cat_value
             term_category = {}
 
             for category in range(1, int(num_categories) + 1):
                 # term category dictionary has labels as keys and value associated with label as value
-                cat_label = input("Please enter the text string label for the category %d:\t" % category)
-                cat_value = input("Please enter the value associated with label \"%s\":\t" % cat_label)
+                msg = f"Please enter the text string label for the category: {category}"
+                cat_label = Prompt.ask(format_prompt_msg(msg)) 
+                msg = f"Please enter the value associated with label: {cat_label}"
+                cat_value = Prompt.ask(format_prompt_msg(msg))                 
                 term_category[cat_label] = cat_value
 
         else:
@@ -1825,15 +1825,19 @@ def annotate_data_element(source_variable, current_tuple, source_variable_annota
             term_category = []
             for category in range(1, int(num_categories) + 1):
                 # term category dictionary has labels as keys and value associated with label as value
-                cat_label = input("Please enter the text string label for the category %d:\t" % category)
+                msg = f"Please enter the text string label for the category: {category}"
+                cat_label = Prompt.ask(format_prompt_msg(msg))                   
                 term_category.append(cat_label)
 
     # if term is not categorical then ask for min/max values.  If it is categorical then simply extract
     # it from the term_category dictionary
     if term_datatype != URIRef(Constants.XSD["complexType"]):
-        term_min = input("Please enter the minimum value [NA]:\t")
-        term_max = input("Please enter the maximum value [NA]:\t")
-        term_units = input("Please enter the units [NA]:\t")
+        msg = f"Please enter the minimum value"
+        term_min = Prompt.ask(format_prompt_msg(msg), default="NA") 
+        msg = f"Please enter the maximum value"
+        term_max = Prompt.ask(format_prompt_msg(msg), default="NA") 
+        msg = f"Please enter the units"
+        term_units = Prompt.ask(format_prompt_msg(msg), default="NA")         
         # check if responseOptions is a key, if not create it
         if 'responseOptions' not in source_variable_annotations[current_tuple].keys():
             source_variable_annotations[current_tuple]['responseOptions'] = {}
@@ -1876,7 +1880,7 @@ def annotate_data_element(source_variable, current_tuple, source_variable_annota
         source_variable_annotations[current_tuple]['responseOptions']['choices'] = term_category
 
     # print mappings
-    print("\n*************************************************************************************")
+    separator()
     print("Stored mapping: %s ->  " % source_variable)
     print("label: %s" % source_variable_annotations[current_tuple]['label'])
     print("source variable: %s" % source_variable_annotations[current_tuple]['source_variable'])
@@ -1893,7 +1897,7 @@ def annotate_data_element(source_variable, current_tuple, source_variable_annota
         print("maximumValue: %s" % source_variable_annotations[current_tuple]['responseOptions']['maxValue'])
     if term_datatype == URIRef(Constants.XSD["complexType"]):
         print("choices: %s" % source_variable_annotations[current_tuple]['responseOptions']['choices'])
-    print("---------------------------------------------------------------------------------------")
+    separator()
 
 def DD_UUID (element,dd_struct,dataset_identifier=None):
     '''
